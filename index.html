@@ -299,7 +299,7 @@
         .install-banner {
             display: none; position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 14px 18px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-            z-index: 999; display: flex; align-items: center; gap: 12px;
+            z-index: 999; align-items: center; gap: 12px;
         }
         .install-banner .ib-icon { font-size: 28px; }
         .install-banner .ib-text { flex: 1; }
@@ -310,6 +310,14 @@
             border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap;
         }
         .install-banner .ib-close { background: none; border: none; font-size: 1.2rem; color: #aaa; cursor: pointer; }
+
+        .manual-install-guide {
+            background: rgba(255,255,255,0.15); border-radius: 10px;
+            padding: 10px 14px; margin-top: 10px; display: none; text-align: left;
+            color: white; font-size: 0.82rem; line-height: 1.6;
+        }
+        .manual-install-guide.show { display: block; }
+        .manual-install-guide code { background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 3px; font-size: 0.8rem; }
 
         @media (max-width: 480px) {
             body { padding: 10px; }
@@ -361,6 +369,12 @@
         </div>
         <h1>💬 对话分析器</h1>
         <p>选择聊天对象，上传截图或输入对话，AI帮你分析并提供回复建议</p>
+        <div class="manual-install-guide" id="manualInstallGuide">
+            <strong>📲 想像APP一样使用？</strong><br>
+            请用 <code>Chrome浏览器</code> 或 <code>Edge浏览器</code> 打开本页面，<br>
+            然后点击右上角 <code>⋮</code> → <code>添加到主屏幕</code><br>
+            <span style="font-size:0.75rem;opacity:0.8;">当前浏览器不支持PWA安装</span>
+        </div>
     </div>
 
     <!-- 登录注册 -->
@@ -1593,10 +1607,12 @@ checkAuth();
 // ===== PWA 安装与Service Worker =====
 let deferredPrompt = null;
 const installBanner = document.getElementById('installBanner');
+let pwaSupported = false;
 
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    pwaSupported = true;
     if (!localStorage.getItem('pwaInstallDismissed')) {
         installBanner.style.display = 'flex';
     }
@@ -1625,6 +1641,12 @@ window.addEventListener('appinstalled', () => {
     installBanner.style.display = 'none';
     deferredPrompt = null;
 });
+
+setTimeout(() => {
+    if (!pwaSupported) {
+        document.getElementById('manualInstallGuide').classList.add('show');
+    }
+}, 2000);
 </script>
 </body>
 </html>
