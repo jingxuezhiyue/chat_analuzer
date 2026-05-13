@@ -345,6 +345,26 @@
             .history-images img, .history-images .more { width: 36px; height: 36px; }
             .header-top { flex-wrap: wrap; gap: 6px; }
         }
+
+        .chat-area { display: none; flex-direction: column; }
+        .chat-area.active { display: flex; }
+        .chat-messages {
+            flex: 1; min-height: 280px; max-height: 380px; overflow-y: auto;
+            padding: 12px; background: #f9f9f9; border-radius: 12px;
+            margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;
+        }
+        .chat-msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.5; word-wrap: break-word; }
+        .chat-msg.user { align-self: flex-end; background: #667eea; color: white; border-bottom-right-radius: 4px; }
+        .chat-msg.ai { align-self: flex-start; background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
+        .chat-msg.ai .ai-label { font-size: 0.72rem; color: #667eea; font-weight: 600; margin-bottom: 4px; }
+        .chat-msg.ai .ai-insight { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ddd; font-size: 0.8rem; color: #888; }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input-row input { flex: 1; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.93rem; }
+        .chat-input-row input:focus { outline: none; border-color: #667eea; }
+        .chat-send-btn { padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        .chat-send-btn:hover { background: #5a6fd6; }
+        .chat-typing { align-self: flex-start; padding: 8px 14px; color: #999; font-size: 0.85rem; }
+        .chat-hint { text-align: center; color: #aaa; font-size: 0.82rem; padding: 20px; }
     </style>
 </head>
 <body>
@@ -428,13 +448,16 @@
                 </div>
             </div>
 
-            <div class="card-title">📤 上传截图 / 直接输入</div>
+            <div class="card-title">📤 上传截图 / 直接输入 / AI聊天</div>
             <div class="input-methods">
                 <div class="input-method-btn active" data-method="upload">
                     <div class="icon">🖼️</div><div class="label">上传截图</div>
                 </div>
                 <div class="input-method-btn" data-method="text">
                     <div class="icon">💬</div><div class="label">直接输入</div>
+                </div>
+                <div class="input-method-btn" data-method="chat">
+                    <div class="icon">🤖</div><div class="label">AI聊天</div>
                 </div>
             </div>
 
@@ -465,6 +488,17 @@
                 <div class="form-group">
                     <label>💭 我方上下文（可选）</label>
                     <textarea id="contextText" class="editable-text" placeholder="如果有之前的对话背景..." style="min-height:60px;"></textarea>
+                </div>
+            </div>
+
+            <div class="chat-area" id="chatArea">
+                <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">🤖 和AI聊聊你与这个角色的情况，AI会记住你的想法并帮你分析</div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-hint">开始说说你现在的想法吧～</div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="说说你的想法...">
+                    <button class="chat-send-btn" id="chatSendBtn">发送</button>
                 </div>
             </div>
 
@@ -825,6 +859,11 @@ function openAnalyze(charId) {
     document.querySelector('[data-method="upload"]').classList.add('active');
     document.getElementById('uploadArea').style.display = 'block';
     document.getElementById('textInputArea').classList.remove('active');
+    document.getElementById('chatArea').classList.remove('active');
+    document.getElementById('startAnalyzeBtn').style.display = '';
+
+    // 重置聊天
+    resetChat();
 
     showPage('analyze');
 }
@@ -933,9 +972,16 @@ document.querySelectorAll('.input-method-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
         document.querySelectorAll('.input-method-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
-        uploadArea.style.display = btn.dataset.method==='upload' ? 'block' : 'none';
-        previewGrid.style.display = btn.dataset.method==='upload' && uploadedFiles.length>0 ? 'grid' : 'none';
-        document.getElementById('textInputArea').classList.toggle('active', btn.dataset.method==='text');
+        const method = btn.dataset.method;
+        uploadArea.style.display = method==='upload' ? 'block' : 'none';
+        previewGrid.style.display = method==='upload' && uploadedFiles.length>0 ? 'grid' : 'none';
+        document.getElementById('textInputArea').classList.toggle('active', method==='text');
+        document.getElementById('chatArea').classList.toggle('active', method==='chat');
+        document.getElementById('startAnalyzeBtn').style.display = method==='chat' ? 'none' : '';
+        if(method==='chat'){
+            resetChat();
+            addChatMsg('ai','你好！我是你的对话分析助手 🤖\n\n我知道你正在和「'+getCharName()+'」交流。随便和我聊聊你的想法、困惑或者感受吧，我会帮你理清思路～');
+        }
     });
 });
 
@@ -1058,6 +1104,115 @@ document.getElementById('confirmAnalyze').addEventListener('click', async()=>{
     if(!left&&!right){alert('请先OCR识别');return;}
     const text = `【我方】${right||'无'}\n【对方】${left||'无'}`;
     try{await deepSeekAnalyze(text, '', false);}catch(e){document.getElementById('progressText').textContent='❌ '+e.message;}
+});
+
+// ===== AI聊天功能 =====
+let chatHistory = [];
+let chatCharId = null;
+
+function resetChat(){
+    chatHistory = [];
+    chatCharId = currentCharacterId;
+    const msgDiv = document.getElementById('chatMessages');
+    msgDiv.innerHTML = '<div class="chat-hint">开始说说你现在的想法吧～</div>';
+}
+
+function buildChatPersona() {
+    const userProfile = getUserProfile();
+    const charInfo = getCharacterInfo(chatCharId);
+    const persona = buildSmartPersona(chatCharId);
+    return `系统设定：你是一个有共情能力的对话分析智能体。请扮演一个善于倾听的朋友角色，用口语化的中文和用户交流。
+
+${userProfile}
+${charInfo}
+${persona.prompt ? '【基于历史数据的性格画像】'+persona.prompt : ''}
+
+你的职责：
+1. 认真倾听用户表达的想法、感受和困惑
+2. 和用户进行自然的对话交流，像朋友一样回应
+3. 在每次回复的末尾，用【自我分析】格式简短总结你对用户想法的理解和洞察（1-2句话）
+4. 用温和、支持的语气，适当引导用户表达更多
+
+请开始和用户对话。`;
+}
+
+function addChatMsg(type, text){
+    const msgDiv = document.getElementById('chatMessages');
+    if(msgDiv.querySelector('.chat-hint')){
+        msgDiv.innerHTML = '';
+    }
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + type;
+
+    if(type==='ai'){
+        const parts = text.split('【自我分析】');
+        const mainText = parts[0];
+        const insight = parts[1] ? parts[1].trim() : '';
+        div.innerHTML = `<div class="ai-label">🤖 AI助手</div>${mainText.replace(/\n/g,'<br>')}${insight ? `<div class="ai-insight">💡 ${insight}</div>` : ''}`;
+    } else {
+        div.textContent = text;
+    }
+    msgDiv.appendChild(div);
+    msgDiv.scrollTop = msgDiv.scrollHeight;
+}
+
+function addChatTyping(){
+    const msgDiv = document.getElementById('chatMessages');
+    msgDiv.querySelector('.chat-typing')?.remove();
+    const typing = document.createElement('div');
+    typing.className = 'chat-typing';
+    typing.textContent = 'AI正在思考...';
+    msgDiv.appendChild(typing);
+    msgDiv.scrollTop = msgDiv.scrollHeight;
+    return typing;
+}
+
+document.getElementById('chatSendBtn').addEventListener('click', async ()=>{
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if(!msg) return;
+    input.value = '';
+
+    addChatMsg('user', msg);
+    chatHistory.push({role:'user', content:msg});
+    const typing = addChatTyping();
+
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    const modelName=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
+    if(!apiUrl||!apiKey){ typing.remove(); addChatMsg('ai','⚠️ 请先在设置中配置API'); return; }
+
+    try{
+        const messages = [
+            {role:'system', content:buildChatPersona()},
+            ...chatHistory.slice(-12)
+        ];
+        const res=await fetch(apiUrl,{method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+            body:JSON.stringify({model:modelName,messages,temperature:0.8,stream:false})
+        });
+        if(!res.ok) throw new Error(`API ${res.status}`);
+        const data=await res.json();
+        const reply = data.choices[0].message.content;
+        typing.remove();
+        addChatMsg('ai', reply);
+        chatHistory.push({role:'assistant', content:reply});
+
+        // 保存聊天洞察到情感趋势
+        const insight = reply.split('【自我分析】')[1];
+        if(insight){
+            const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+            const char = chars.find(c=>c.id===chatCharId);
+            saveEmotionTrend(chatCharId, char?char.name:'', '聊天洞察', '('+msg.slice(0,40)+') '+insight.trim());
+        }
+    }catch(err){
+        typing.remove();
+        addChatMsg('ai','❌ '+err.message);
+    }
+});
+
+document.getElementById('chatInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') document.getElementById('chatSendBtn').click();
 });
 
 // ===== DeepSeek专用分析：直接输入文本模式 =====
