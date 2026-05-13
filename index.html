@@ -10,10 +10,10 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#667eea">
     <meta name="description" content="上传聊天截图或输入对话，AI分析对方意图并提供回复建议">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="manifest" href="manifest.json?v=2">
+    <link rel="apple-touch-icon" href="icon-192.png?v=2">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=2">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1541,6 +1541,7 @@ function initDateDropdowns(prefix){
     const ySel = document.getElementById(prefix+'Year');
     const mSel = document.getElementById(prefix+'Month');
     const dSel = document.getElementById(prefix+'Day');
+    if(!ySel || !mSel || !dSel) return;
     if(ySel.options.length>1) return;
     const nowYear = new Date().getFullYear();
     for(let y=nowYear; y>=1940; y--) ySel.add(new Option(y, y));
@@ -1549,8 +1550,10 @@ function initDateDropdowns(prefix){
     mSel.onchange = ()=>{
         const y=parseInt(ySel.value), m=parseInt(mSel.value);
         const maxDay = (y&&m)? new Date(y,m,0).getDate() : 31;
+        const oldDay = dSel.value;
         dSel.options.length=1;
         for(let d=1; d<=maxDay; d++) dSel.add(new Option(d, d));
+        if(oldDay && parseInt(oldDay) <= maxDay) dSel.value = oldDay;
     };
     ySel.onchange = ()=>{ if(mSel.value) mSel.onchange(); };
 }
@@ -1564,9 +1567,20 @@ function setDateToDropdowns(prefix, dateStr){
     if(!dateStr) return;
     const parts = dateStr.split('-');
     if(parts.length!==3) return;
-    document.getElementById(prefix+'Year').value = parts[0];
-    document.getElementById(prefix+'Month').value = parseInt(parts[1]);
-    setTimeout(()=>{ document.getElementById(prefix+'Day').value = parseInt(parts[2]); }, 100);
+    const ySel=document.getElementById(prefix+'Year');
+    const mSel=document.getElementById(prefix+'Month');
+    const dSel=document.getElementById(prefix+'Day');
+    if(!ySel||!mSel||!dSel) return;
+    initDateDropdowns(prefix);
+    ySel.value = parts[0];
+    mSel.value = parseInt(parts[1]);
+    mSel.onchange();
+    let retries=0;
+    const trySetDay = ()=>{
+        if(dSel.options.length>1){ dSel.value=parseInt(parts[2]); return; }
+        if(++retries<10) setTimeout(trySetDay, 50);
+    };
+    trySetDay();
 }
 
 function displayAnalysis(text){
