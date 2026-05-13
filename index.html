@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>对话分析器</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="对话分析器">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="上传聊天截图或输入对话，AI分析对方意图并提供回复建议">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+
+        .header {
+            text-align: center; color: white; margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+        .header p { opacity: 0.9; font-size: 1rem; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .header-btns { display: flex; gap: 8px; }
+        .header-btn {
+            background: rgba(255,255,255,0.2); border: none; color: white;
+            padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;
+        }
+        .header-btn:hover { background: rgba(255,255,255,0.3); }
+
+        .card {
+            background: white; border-radius: 16px; padding: 24px;
+            margin-bottom: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .card-title {
+            font-size: 1.15rem; font-weight: 600; color: #333;
+            margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+        }
+
+        .back-btn {
+            background: none; border: none; color: #667eea; cursor: pointer;
+            font-size: 0.95rem; display: flex; align-items: center; gap: 4px;
+            padding: 8px 0; margin-bottom: 12px;
+        }
+        .back-btn:hover { text-decoration: underline; }
+
+        /* 角色列表首页 */
+        .character-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 14px; margin-top: 16px;
+        }
+        .character-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+            border-radius: 14px; padding: 18px; cursor: pointer;
+            transition: all 0.3s; border: 2px solid transparent; text-align: center;
+        }
+        .character-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(102,126,234,0.2); border-color: #667eea; }
+        .character-avatar {
+            width: 56px; height: 56px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; font-size: 24px; display: flex;
+            align-items: center; justify-content: center; margin: 0 auto 10px;
+        }
+        .character-name { font-weight: 600; color: #333; font-size: 1rem; }
+        .character-meta { font-size: 0.82rem; color: #888; margin-top: 4px; }
+        .empty-state { text-align: center; padding: 50px 20px; color: #999; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .add-character-big {
+            width: 200px; height: 140px; border: 2px dashed #ccc; border-radius: 14px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.3s; background: #fafafa; grid-row: span 1;
+        }
+        .add-character-big:hover { border-color: #667eea; background: #f0f0ff; }
+        .add-character-big .plus { font-size: 36px; color: #999; }
+        .add-character-big .text { font-size: 0.9rem; color: #888; margin-top: 6px; }
+
+        /* 分析页面 */
+        .analyze-header {
+            display: flex; align-items: center; gap: 12px; padding-bottom: 16px;
+            border-bottom: 1px solid #eee; margin-bottom: 18px;
+        }
+        .analyze-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; font-size: 20px; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .analyze-info h3 { font-size: 1.05rem; color: #333; }
+        .analyze-info p { font-size: 0.85rem; color: #888; }
+
+        .input-methods { display: flex; gap: 10px; margin-bottom: 16px; }
+        .input-method-btn {
+            flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px;
+            background: white; cursor: pointer; text-align: center; transition: all 0.3s;
+        }
+        .input-method-btn:hover { border-color: #667eea; }
+        .input-method-btn.active { border-color: #667eea; background: rgba(102,126,234,0.08); }
+        .input-method-btn .icon { font-size: 22px; margin-bottom: 6px; }
+        .input-method-btn .label { font-size: 0.88rem; color: #333; }
+
+        .upload-area {
+            border: 2px dashed #ddd; border-radius: 12px; padding: 30px;
+            text-align: center; cursor: pointer; transition: all 0.3s; background: #fafafa;
+        }
+        .upload-area:hover { border-color: #667eea; background: #f0f0ff; }
+        .upload-area.dragover { border-color: #667eea; background: #e8e8ff; }
+        .upload-icon { font-size: 36px; margin-bottom: 8px; }
+        .upload-text { color: #666; font-size: 0.95rem; }
+        .upload-hint { color: #999; font-size: 0.82rem; margin-top: 6px; }
+
+        .preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+        .preview-item {
+            position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+            background: #f5f5f5; cursor: pointer;
+        }
+        .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .preview-remove {
+            position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+            background: rgba(0,0,0,0.6); border: none; border-radius: 50%; color: white;
+            font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .preview-add {
+            display: flex; align-items: center; justify-content: center;
+            border: 2px dashed #ddd; border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        }
+        .preview-add:hover { border-color: #667eea; background: #f0f0ff; }
+        .preview-add .icon { font-size: 28px; color: #bbb; }
+
+        .text-input-area { display: none; }
+        .text-input-area.active { display: block; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block; font-size: 0.9rem; color: #555;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 11px 14px; border: 1px solid #ddd;
+            border-radius: 8px; font-size: 0.95rem; transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: #667eea;
+        }
+        .form-group textarea { min-height: 70px; resize: vertical; }
+
+        .scenario-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+        .scenario-option {
+            padding: 9px; border: 2px solid #ddd; border-radius: 8px;
+            text-align: center; cursor: pointer; transition: all 0.3s; font-size: 0.85rem;
+        }
+        .scenario-option:hover { border-color: #667eea; }
+        .scenario-option.selected { border-color: #667eea; background: rgba(102,126,234,0.1); }
+
+        .btn {
+            padding: 13px 26px; border: none; border-radius: 8px; font-size: 0.98rem;
+            font-weight: 600; cursor: pointer; transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; width: 100%;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.35); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn-secondary:hover { background: #e0e0e0; }
+        .btn-small { padding: 7px 14px; font-size: 0.85rem; }
+
+        .result-section { display: none; }
+        .result-section.show { display: block; }
+
+        .analysis-content { padding: 14px; background: #f9f9f9; border-radius: 8px; margin-bottom: 14px; }
+        .analysis-item { margin-bottom: 14px; }
+        .analysis-label { font-weight: 600; color: #333; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+        .analysis-value { color: #555; line-height: 1.55; padding-left: 22px; }
+
+        .suggestions { display: flex; flex-direction: column; gap: 10px; }
+        .suggestion-item {
+            padding: 13px 15px; background: linear-gradient(135deg, rgba(102,126,234,0.07) 0%, rgba(118,75,162,0.07) 100%);
+            border-radius: 8px; border-left: 4px solid #667eea;
+        }
+        .suggestion-header { font-weight: 600; color: #667eea; margin-bottom: 5px; font-size: 0.92rem; }
+        .suggestion-text { color: #333; line-height: 1.45; }
+
+        .spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 7px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-text { text-align: center; color: #666; margin-top: 10px; font-size: 0.88rem; }
+
+        .toggle-config {
+            background: none; border: none; color: #667eea; cursor: pointer;
+            font-size: 0.9rem; padding: 8px 0; display: flex; align-items: center; gap: 6px;
+        }
+        .toggle-config:hover { text-decoration: underline; }
+        .config-content { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid #eee; }
+        .config-content.show { display: block; }
+
+        .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .profile-grid .form-group { margin-bottom: 0; }
+        .profile-grid .form-group.full-width { grid-column: span 2; }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white; border-radius: 16px; padding: 22px;
+            max-width: 480px; width: 92%; max-height: 82vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+        .modal-title { font-size: 1.2rem; font-weight: 600; color: #333; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
+
+        .ocr-section { margin-top: 14px; }
+        .ocr-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .editable-text { width: 100%; min-height: 70px; padding: 11px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.93rem; resize: vertical; font-family: inherit; }
+        .editable-text:focus { outline: none; border-color: #667eea; }
+
+        .hidden { display: none !important; }
+
+        .chat-display { background: #f5f5f5; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+        .chat-bubble { padding: 10px 14px; border-radius: 10px; max-width: 80%; word-wrap: break-word; }
+        .chat-left { background: white; border-bottom-left-radius: 4px; }
+        .chat-right { background: #667eea; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+        .chat-label { font-size: 0.72rem; color: #888; margin-bottom: 4px; }
+
+        .page-home,
+        .page-analyze,
+        .page-settings,
+        .page-history {
+            display: none;
+        }
+        .page-home.show,
+        .page-analyze.show,
+        .page-settings.show,
+        .page-history.show {
+            display: block;
+        }
+
+        .stab-content { display: block; }
+        .stab-content.hidden { display: none; }
+
+        [data-stab].active {
+            background: white !important;
+            color: #667eea !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .history-item {
+            padding: 16px; border: 1px solid #eee; border-radius: 10px;
+            margin-bottom: 12px; cursor: pointer; transition: all 0.3s;
+        }
+        .history-item:hover { border-color: #667eea; background: #fafaff; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .history-char { font-weight: 600; color: #667eea; font-size: 0.95rem; }
+        .history-time { font-size: 0.8rem; color: #999; }
+        .history-preview { font-size: 0.88rem; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .history-images { display: flex; gap: 6px; margin-top: 8px; }
+        .history-images img { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; }
+        .history-images .more { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: #f0f0f0; border-radius: 4px; font-size: 0.8rem; color: #666; }
+        .history-detail { display: none; }
+        .history-detail.show { display: block; }
+        .history-del-btn { background: none; border: none; color: #f44336; cursor: pointer; font-size: 0.82rem; }
+        .history-del-btn:hover { text-decoration: underline; }
+        .empty-history { text-align: center; padding: 40px; color: #999; }
+
+        .trend-dots { display: flex; gap: 3px; margin-top: 8px; justify-content: center; }
+        .trend-dot { width: 8px; height: 8px; border-radius: 50%; background: #ddd; }
+        .trend-dot.positive { background: #4caf50; }
+        .trend-dot.negative { background: #f44336; }
+        .trend-dot.neutral { background: #ff9800; }
+        .trend-label { font-size: 0.72rem; color: #888; margin-top: 4px; }
+        .trend-section { margin-top: 12px; border-top: 1px solid #eee; padding-top: 12px; }
+        .trend-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.88rem; }
+        .trend-emo { font-size: 0.85rem; color: #555; }
+        .trend-time { font-size: 0.78rem; color: #999; }
+        .trend-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
+        .trend-badge.positive { background: #e8f5e9; color: #2e7d32; }
+        .trend-badge.negative { background: #ffebee; color: #c62828; }
+        .trend-badge.neutral { background: #fff3e0; color: #e65100; }
+        .adoption-item { padding: 8px 12px; background: #f5f5f5; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; }
+        .adoption-item .adopt-title { font-weight: 600; color: #667eea; }
+        .adoption-item .adopt-text { color: #555; margin-top: 4px; }
+        .htab-content { display: block; }
+        .htab-content.hidden { display: none; }
+        [data-htab].active { background: white !important; color: #667eea !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .install-banner {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; padding: 14px 18px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            z-index: 999; display: flex; align-items: center; gap: 12px;
+        }
+        .install-banner .ib-icon { font-size: 28px; }
+        .install-banner .ib-text { flex: 1; }
+        .install-banner .ib-title { font-weight: 600; font-size: 0.92rem; color: #333; }
+        .install-banner .ib-desc { font-size: 0.78rem; color: #888; margin-top: 2px; }
+        .install-banner .ib-btn {
+            padding: 8px 16px; background: #667eea; color: white; border: none;
+            border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+        .install-banner .ib-close { background: none; border: none; font-size: 1.2rem; color: #aaa; cursor: pointer; }
+
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .header h1 { font-size: 1.5rem; }
+            .header p { font-size: 0.88rem; }
+            .card { padding: 16px; border-radius: 12px; margin-bottom: 14px; }
+            .card-title { font-size: 1rem; margin-bottom: 12px; }
+            .btn { padding: 12px 20px; font-size: 0.92rem; }
+            .character-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .character-card { padding: 14px; }
+            .character-avatar { width: 44px; height: 44px; font-size: 20px; }
+            .add-character-big { width: 100%; height: 100px; }
+            .scenario-select { grid-template-columns: repeat(2, 1fr); }
+            .profile-grid { grid-template-columns: 1fr; }
+            .profile-grid .form-group.full-width { grid-column: span 1; }
+            .upload-area { padding: 24px 16px; }
+            .preview-grid { grid-template-columns: repeat(3, 1fr); }
+            .suggestion-item { padding: 10px 12px; }
+            .analyze-header { gap: 8px; }
+            .analyze-avatar { width: 36px; height: 36px; font-size: 16px; }
+            .input-methods { gap: 6px; }
+            .input-method-btn { padding: 10px 6px; }
+            .input-method-btn .icon { font-size: 18px; }
+            .input-method-btn .label { font-size: 0.8rem; }
+            .history-images img, .history-images .more { width: 36px; height: 36px; }
+            .header-top { flex-wrap: wrap; gap: 6px; }
+        }
+    </style>
+</head>
+<body>
+<div class="install-banner" id="installBanner" style="display:none;">
+    <span class="ib-icon">📱</span>
+    <div class="ib-text">
+        <div class="ib-title">添加到主屏幕</div>
+        <div class="ib-desc">像使用APP一样快速打开</div>
+    </div>
+    <button class="ib-btn" id="installBtn">安装</button>
+    <button class="ib-close" id="installClose">&times;</button>
+</div>
+<div class="container">
+    <div class="header">
+        <div class="header-top" id="headerTop" style="display:none;">
+            <button class="header-btn" id="historyBtn">📋 历史</button>
+            <button class="header-btn" id="settingsBtn">⚙️ 设置</button>
+            <div style="color:white;font-size:0.95rem;">
+                <span id="userPhone"></span>
+                <button class="header-btn logout-btn" id="logoutBtn">退出</button>
+            </div>
+        </div>
+        <h1>💬 对话分析器</h1>
+        <p>选择聊天对象，上传截图或输入对话，AI帮你分析并提供回复建议</p>
+    </div>
+
+    <!-- 登录注册 -->
+    <div id="authSection">
+        <div class="card">
+            <div style="max-width:380px;margin:0 auto;">
+                <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #ddd;margin-bottom:20px;">
+                    <div class="auth-tab active" data-tab="login" style="flex:1;padding:12px;text-align:center;cursor:pointer;background:#667eea;color:white;">登录</div>
+                    <div class="auth-tab" data-tab="register" style="flex:1;padding:12px;text-align:center;cursor:pointer;background:#f5f5f5;color:#666;">注册</div>
+                </div>
+
+                <div class="auth-form" id="loginForm">
+                    <div class="form-group"><label>手机号</label><input type="tel" id="loginPhone" placeholder="请输入手机号" maxlength="11"></div>
+                    <div class="form-group"><label>密码</label><input type="password" id="loginPassword" placeholder="请输入密码"></div>
+                    <button class="btn btn-primary" id="loginBtn">登录</button>
+                </div>
+                <div class="auth-form hidden" id="registerForm">
+                    <div class="form-group"><label>手机号</label><input type="tel" id="regPhone" placeholder="请输入手机号" maxlength="11"></div>
+                    <div class="form-group"><label>密码</label><input type="password" id="regPassword" placeholder="至少6位"></div>
+                    <div class="form-group"><label>确认密码</label><input type="password" id="regPassword2" placeholder="再次输入密码"></div>
+                    <button class="btn btn-primary" id="registerBtn">注册</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 角色首页 -->
+    <div id="homePage" class="page-home">
+        <div class="card">
+            <div class="card-title">👥 聊天对象</div>
+            <div class="character-grid" id="homeCharacterGrid">
+                <div class="add-character-big" id="homeAddChar">
+                    <span class="plus">+</span>
+                    <span class="text">添加新角色</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分析页面 -->
+    <div id="analyzePage" class="page-analyze">
+        <div class="card">
+            <button class="back-btn" id="backToHome">← 返回角色列表</button>
+            <div class="analyze-header">
+                <div class="analyze-avatar" id="analyzeAvatar">👤</div>
+                <div class="analyze-info">
+                    <h3 id="analyzeName">--</h3>
+                    <p id="analyzeMeta">--</p>
+                    <div id="analyzeTrend" style="margin-top:6px;"></div>
+                    <div id="analyzePersona"></div>
+                </div>
+            </div>
+
+            <div class="card-title">📤 上传截图 / 直接输入</div>
+            <div class="input-methods">
+                <div class="input-method-btn active" data-method="upload">
+                    <div class="icon">🖼️</div><div class="label">上传截图</div>
+                </div>
+                <div class="input-method-btn" data-method="text">
+                    <div class="icon">💬</div><div class="label">直接输入</div>
+                </div>
+            </div>
+
+            <div id="uploadArea" class="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <div class="upload-text">拖拽图片到这里 或 点击选择文件</div>
+                <div class="upload-hint">支持多张 PNG、JPG 截图</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/png,image/jpeg" multiple capture="environment" style="display:none;">
+            <div class="preview-grid" id="previewGrid" style="display:none;"></div>
+
+            <div class="text-input-area" id="textInputArea">
+                <div class="form-group">
+                    <label>对话场景</label>
+                    <div class="scenario-select">
+                        <div class="scenario-option selected" data-scenario="friend">朋友聊天</div>
+                        <div class="scenario-option" data-scenario="work">工作沟通</div>
+                        <div class="scenario-option" data-scenario="love">恋人相处</div>
+                        <div class="scenario-option" data-scenario="family">家人交流</div>
+                        <div class="scenario-option" data-scenario="date">相亲对象</div>
+                        <div class="scenario-option" data-scenario="other">其他</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>🗨️ 对方说了什么</label>
+                    <textarea id="opponentText" class="editable-text" placeholder="请输入对方说的话..." style="min-height:60px;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>💭 我方上下文（可选）</label>
+                    <textarea id="contextText" class="editable-text" placeholder="如果有之前的对话背景..." style="min-height:60px;"></textarea>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="startAnalyzeBtn" style="margin-top:16px;">🔍 开始分析</button>
+            <div class="progress-text" id="progressText"></div>
+        </div>
+
+        <div class="card result-section" id="ocrSection">
+            <div class="card-title">📝 识别结果</div>
+            <p style="color:#666;font-size:0.87rem;margin-bottom:10px;">请确认识别结果：</p>
+            <div class="chat-display">
+                <div style="margin-bottom:10px;">
+                    <div class="chat-label">对方</div>
+                    <textarea class="editable-text chat-left" id="leftText" placeholder="识别出的文字..."></textarea>
+                </div>
+                <div>
+                    <div class="chat-label">我方</div>
+                    <textarea class="editable-text chat-right" id="rightText" placeholder="识别出的文字..."></textarea>
+                </div>
+            </div>
+            <div class="ocr-actions">
+                <button class="btn btn-secondary" id="reOCR">🔄 重新识别</button>
+                <button class="btn btn-primary" id="confirmAnalyze">✅ 确认并分析</button>
+            </div>
+        </div>
+
+        <div class="card result-section" id="resultSection">
+            <div class="card-title">📊 分析结果</div>
+            <div class="analysis-content">
+                <div class="analysis-item">
+                    <div class="analysis-label">👤 对方分析</div>
+                    <div class="analysis-value" id="personAnalysis"></div>
+                </div>
+                <div class="analysis-item">
+                    <div class="analysis-label">💭 关系/场景</div>
+                    <div class="analysis-value" id="relationship"></div>
+                </div>
+            </div>
+            <div class="card-title">💡 回复建议</div>
+            <div class="suggestions" id="suggestions"></div>
+        </div>
+    </div>
+
+    <!-- 设置页面 -->
+    <div id="settingsPage" class="page-settings">
+        <div class="card">
+            <button class="back-btn" id="backFromSettings">← 返回</button>
+            <div class="nav-tabs" style="display:flex;gap:4px;margin-bottom:16px;background:#f5f5f5;padding:4px;border-radius:8px;">
+                <button class="nav-tab active" data-stab="myProfile" style="flex:1;padding:10px 14px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:0.92rem;color:#666;">👤 我的档案</button>
+                <button class="nav-tab" data-stab="apiConfig" style="flex:1;padding:10px 14px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:0.92rem;color:#666;">⚙️ API配置</button>
+            </div>
+
+            <div class="stab-content" id="stabMyProfile">
+                <div class="card-title">👤 我的档案</div>
+                <p style="color:#666;font-size:0.87rem;margin-bottom:14px;">填写你的信息帮助AI更精准地分析</p>
+                <div class="profile-grid">
+                    <div class="form-group">
+                        <label>性别</label>
+                        <select id="profileGender"><option value="">请选择</option><option value="male">男</option><option value="female">女</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>生日</label>
+                        <input type="date" id="profileBirthday" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;">
+                    </div>
+                    <div class="form-group">
+                        <label>MBTI性格</label>
+                        <select id="profileMbti">
+                            <option value="">请选择</option>
+                            <option value="INTJ">INTJ - 建筑师</option><option value="INTP">INTP - 逻辑学家</option>
+                            <option value="ENTJ">ENTJ - 指挥官</option><option value="ENTP">ENTP - 辩论家</option>
+                            <option value="INFJ">INFJ - 提倡者</option><option value="INFP">INFP - 调停者</option>
+                            <option value="ENFJ">ENFJ - 主人公</option><option value="ENFP">ENFP - 竞选者</option>
+                            <option value="ISTJ">ISTJ - 物流师</option><option value="ISFJ">ISFJ - 守护者</option>
+                            <option value="ESTJ">ESTJ - 总经理</option><option value="ESFJ">ESFJ - 执政官</option>
+                            <option value="ISTP">ISTP - 鉴赏家</option><option value="ISFP">ISFP - 探险家</option>
+                            <option value="ESTP">ESTP - 企业家</option><option value="ESFP">ESFP - 表演者</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>年龄段</label>
+                        <select id="profileAge"><option value="">请选择</option><option value="18-25">18-25岁</option><option value="26-35">26-35岁</option><option value="36-45">36-45岁</option><option value="46+">46岁以上</option></select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>沟通风格（可多选）</label>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" value="喜欢简短回复" class="style-check"> 简短回复</label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" value="喜欢详细解释" class="style-check"> 详细解释</label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" value="倾向面对面沟通" class="style-check"> 面对面</label>
+                            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" value="打字较慢" class="style-check"> 打字慢</label>
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>其他说明</label>
+                        <textarea id="profileOther" class="editable-text" placeholder="还有什么想补充的？" style="min-height:55px;"></textarea>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="saveProfileBtn" style="margin-top:14px;">保存档案</button>
+            </div>
+
+            <div class="stab-content hidden" id="stabApiConfig">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>快速配置</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                        <button class="btn btn-small btn-secondary quick-config-btn" data-url="https://api.deepseek.com/chat/completions" data-model="deepseek-v4-pro" style="background:#e8eaf6;color:#3949ab;font-weight:600;">DeepSeek V4 Pro</button>
+                        <button class="btn btn-small btn-secondary quick-config-btn" data-url="https://api.deepseek.com/chat/completions" data-model="deepseek-chat">DeepSeek V3</button>
+                        <button class="btn btn-small btn-secondary quick-config-btn" data-url="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.1-8b-instant">Groq（备选）</button>
+                    </div>
+                </div>
+                <p style="font-size:0.82rem;color:#888;margin-bottom:12px;">💡 截图先由OCR提取文字（约30秒/张），再由DeepSeek分析对话</p>
+                <div class="form-group"><label>API 地址</label><input type="text" id="apiUrl" placeholder="https://api.deepseek.com/chat/completions"></div>
+                <div class="form-group"><label>API 密钥</label><input type="password" id="apiKey" placeholder="sk-..."></div>
+                <div class="form-group"><label>模型名称</label><input type="text" id="modelName" placeholder="如: deepseek-v4-pro"></div>
+                <button class="btn btn-secondary" id="testConnectionBtn" style="width:auto;display:inline-block;margin-top:8px;">🔗 测试连接</button>
+                <div id="connectionStatus" style="margin-top:8px;font-size:0.88rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史记录页面 -->
+    <div id="historyPage" class="page-history">
+        <div class="card">
+            <button class="back-btn" id="backFromHistory">← 返回</button>
+            <div class="card-title">📋 分析历史</div>
+            <div style="display:flex;gap:4px;margin-bottom:14px;background:#f5f5f5;padding:4px;border-radius:8px;">
+                <button class="nav-tab active" data-htab="historyList" style="flex:1;padding:10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:0.88rem;color:#666;">📊 分析记录</button>
+                <button class="nav-tab" data-htab="adoptionList" style="flex:1;padding:10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:0.88rem;color:#666;">✅ 采纳记录</button>
+            </div>
+            <div class="htab-content" id="htabHistoryList"></div>
+            <div class="htab-content hidden" id="htabAdoptionList"></div>
+        </div>
+    </div>
+
+    <!-- 角色编辑弹窗 -->
+    <div class="modal" id="characterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">添加角色</div>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div>
+                <div class="form-group"><label>称呼（代号）</label><input type="text" id="charName" placeholder="如：同事小李、相亲对象"></div>
+                <div class="form-group"><label>性别</label><select id="charGender"><option value="">请选择</option><option value="male">男</option><option value="female">女</option></select></div>
+                <div class="form-group"><label>生日（估计）</label><input type="date" id="charBirthday" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;"></div>
+                <div class="form-group"><label>MBTI（估计）</label><select id="charMbti">
+                    <option value="">请选择</option>
+                    <option value="INTJ">INTJ</option><option value="INTP">INTP</option><option value="ENTJ">ENTJ</option><option value="ENTP">ENTP</option>
+                    <option value="INFJ">INFJ</option><option value="INFP">INFP</option><option value="ENFJ">ENFJ</option><option value="ENFP">ENFP</option>
+                    <option value="ISTJ">ISTJ</option><option value="ISFJ">ISFJ</option><option value="ESTJ">ESTJ</option><option value="ESFJ">ESFJ</option>
+                    <option value="ISTP">ISTP</option><option value="ISFP">ISFP</option><option value="ESTP">ESTP</option><option value="ESFP">ESFP</option>
+                </select></div>
+                <div class="form-group"><label>关系/身份</label><select id="charRelation">
+                    <option value="">请选择</option><option value="friend">朋友</option><option value="colleague">同事/同学</option>
+                    <option value="lover">恋人/暧昧</option><option value="date">相亲对象</option><option value="family">家人</option><option value="customer">客户</option><option value="other">其他</option>
+                </select></div>
+                <div class="form-group"><label>沟通风格</label><textarea id="charStyle" class="editable-text" placeholder="如：打字快、爱发表情包..."></textarea></div>
+                <div class="form-group"><label>备注</label><textarea id="charOther" class="editable-text" placeholder="如：认识3个月了..."></textarea></div>
+                <button class="btn btn-primary" id="saveCharacterBtn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+let currentUser = null;
+let currentCharacterId = null;
+let uploadedFiles = [];
+let ocrWorker = null;
+let editingCharacterId = null;
+
+// 页面切换
+const homePage = document.getElementById('homePage');
+const analyzePage = document.getElementById('analyzePage');
+const settingsPage = document.getElementById('settingsPage');
+const historyPage = document.getElementById('historyPage');
+const authSection = document.getElementById('authSection');
+const headerTop = document.getElementById('headerTop');
+
+function showPage(page) {
+    homePage.classList.toggle('show', page === 'home');
+    analyzePage.classList.toggle('show', page === 'analyze');
+    settingsPage.classList.toggle('show', page === 'settings');
+    historyPage.classList.toggle('show', page === 'history');
+}
+
+function checkAuth() {
+    const userData = localStorage.getItem('chatAnalyzerUser');
+    if (userData) {
+        currentUser = JSON.parse(userData);
+        authSection.classList.add('hidden');
+        headerTop.style.display = 'flex';
+        document.getElementById('userPhone').textContent = currentUser.phone;
+        showPage('home');
+        loadCharacters();
+    } else {
+        authSection.classList.remove('hidden');
+        headerTop.style.display = 'none';
+        showPage(null);
+    }
+}
+
+document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.auth-tab').forEach(t => {
+            t.classList.toggle('active', t === tab);
+            t.style.background = t === tab ? '#667eea' : '#f5f5f5';
+            t.style.color = t === tab ? 'white' : '#666';
+        });
+        document.getElementById('loginForm').classList.toggle('hidden', tab.dataset.tab !== 'login');
+        document.getElementById('registerForm').classList.toggle('hidden', tab.dataset.tab !== 'register');
+    });
+});
+
+document.getElementById('loginBtn').addEventListener('click', () => {
+    const phone = document.getElementById('loginPhone').value.trim();
+    const pwd = document.getElementById('loginPassword').value;
+    if (!phone || !pwd) return alert('请填写完整');
+    const users = JSON.parse(localStorage.getItem('chatAnalyzerUsers') || '{}');
+    const u = users[phone];
+    if (!u || u.password !== pwd) return alert('手机号或密码错误');
+    currentUser = { phone };
+    localStorage.setItem('chatAnalyzerUser', JSON.stringify(currentUser));
+    checkAuth();
+});
+
+document.getElementById('registerBtn').addEventListener('click', () => {
+    const phone = document.getElementById('regPhone').value.trim();
+    const pwd = document.getElementById('regPassword').value;
+    const pwd2 = document.getElementById('regPassword2').value;
+    if (!phone || !pwd || pwd.length < 6 || pwd !== pwd2) return alert('请检查信息');
+    if (!/^1[3-9]\d{9}$/.test(phone)) return alert('手机号格式错误');
+    const users = JSON.parse(localStorage.getItem('chatAnalyzerUsers') || '{}');
+    if (users[phone]) return alert('已注册');
+    users[phone] = { password: pwd, createdAt: Date.now() };
+    localStorage.setItem('chatAnalyzerUsers', JSON.stringify(users));
+    alert('注册成功！请登录');
+    document.querySelector('.auth-tab[data-tab="login"]').click();
+    document.getElementById('loginPhone').value = phone;
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('chatAnalyzerUser'); currentUser = null; checkAuth();
+});
+
+// 导航
+document.getElementById('settingsBtn').addEventListener('click', () => showPage('settings'));
+document.getElementById('backToHome').addEventListener('click', () => showPage('home'));
+document.getElementById('backFromSettings').addEventListener('click', () => showPage('home'));
+document.getElementById('historyBtn').addEventListener('click', () => { renderHistory(); renderAdoptions(); showPage('history'); });
+document.getElementById('backFromHistory').addEventListener('click', () => showPage('home'));
+
+// 设置页tab
+document.querySelectorAll('[data-stab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('[data-stab]').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.stab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById('stab' + tab.dataset.stab.charAt(0).toUpperCase() + tab.dataset.stab.slice(1)).classList.remove('hidden');
+    });
+});
+
+// 角色管理
+function getZodiac(birthday) {
+    if (!birthday) return '';
+    const d = new Date(birthday), m = d.getMonth()+1, day = d.getDate();
+    const signs = [
+        ['摩羯座',[1,1],[1,19]],['水瓶座',[1,20],[2,18]],['双鱼座',[2,19],[3,20]],
+        ['白羊座',[3,21],[4,19]],['金牛座',[4,20],[5,20]],['双子座',[5,21],[6,20]],
+        ['巨蟹座',[6,21],[7,22]],['狮子座',[7,23],[8,22]],['处女座',[8,23],[9,22]],
+        ['天秤座',[9,23],[10,22]],['天蝎座',[10,23],[11,21]],['射手座',[11,22],[12,21]],
+        ['摩羯座',[12,22],[12,31]]
+    ];
+    for (const s of signs)
+        if ((m > s[1][0] || (m===s[1][0] && day>=s[1][1])) && (m < s[2][0] || (m===s[2][0] && day<=s[2][1]))) return s[0];
+    return '';
+}
+function getRelText(r) { return {friend:'朋友',colleague:'同事/同学',lover:'恋人',date:'相亲对象',family:'家人',customer:'客户',other:'其他'}[r]||'其他'; }
+function getGenderText(g) { return {male:'男',female:'女'}[g]||''; }
+
+function loadCharacters() {
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const grid = document.getElementById('homeCharacterGrid');
+    const trends = JSON.parse(localStorage.getItem('chatAnalyzerTrends')||'[]');
+    grid.innerHTML = '<div class="add-character-big" id="homeAddChar"><span class="plus">+</span><span class="text">添加新角色</span></div>';
+
+    chars.forEach(c => {
+        const charTrends = trends.filter(t=>t.charId===c.id).slice(0,5).reverse();
+        let trendHTML = '';
+        if(charTrends.length>0){
+            const latestScore = charTrends[charTrends.length-1].score;
+            const emoji = latestScore==='positive'?'😊':latestScore==='negative'?'😞':'😐';
+            trendHTML = `<div class="trend-dots">${charTrends.map(t=>`<span class="trend-dot ${t.score}" title="${t.emotion||''}"></span>`).join('')}</div>
+            <div class="trend-label">${emoji} 最近${charTrends.length}次</div>`;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'character-card';
+        div.innerHTML = `
+            <div class="character-avatar">${c.name.charAt(0)}</div>
+            <div class="character-name">${c.name}</div>
+            <div class="character-meta">${getRelText(c.relation)}${c.mbti?' · '+c.mbti:''}${c.birthday?' · '+getZodiac(c.birthday):''}</div>
+            ${trendHTML}`;
+        div.addEventListener('click', () => openAnalyze(c.id));
+        grid.appendChild(div);
+    });
+
+    document.getElementById('homeAddChar').addEventListener('click', openAddModal);
+}
+
+function openAnalyze(charId) {
+    currentCharacterId = charId;
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const c = chars.find(x=>x.id===charId);
+    if (!c) return;
+
+    document.getElementById('analyzeAvatar').textContent = c.name.charAt(0);
+    document.getElementById('analyzeName').textContent = c.name;
+    document.getElementById('analyzeMeta').textContent = [getRelText(c.relation),getGenderText(c.gender),c.mbti,c.birthday?getZodiac(c.birthday):null].filter(Boolean).join(' · ') || '--';
+
+    // 显示情感趋势
+    const trends = JSON.parse(localStorage.getItem('chatAnalyzerTrends')||'[]');
+    const charTrends = trends.filter(t=>t.charId===charId).slice(0,10).reverse();
+    let trendDiv = document.getElementById('analyzeTrend');
+    if(charTrends.length>0){
+        const latest = charTrends[charTrends.length-1];
+        const emoji = latest.score==='positive'?'📈':latest.score==='negative'?'📉':'📊';
+        trendDiv.innerHTML = `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div class="trend-dots" style="margin:0;">${charTrends.map(t=>`<span class="trend-dot ${t.score}" title="${t.emotion||''}: ${t.analysisPreview||''}"></span>`).join('')}</div>
+            <span style="font-size:0.8rem;color:#888;">${emoji} ${latest.emotion||'--'}</span>
+        </div>`;
+    } else {
+        trendDiv.innerHTML = '';
+    }
+
+    // 显示智能画像
+    const persona = buildSmartPersona(charId);
+    const personaDiv = document.getElementById('analyzePersona');
+    if(persona.summary){
+        personaDiv.innerHTML = `<div style="margin-top:8px;padding:10px;background:rgba(102,126,234,0.08);border-radius:8px;font-size:0.82rem;color:#555;line-height:1.5;">
+            <div style="font-weight:600;color:#667eea;margin-bottom:4px;">🧠 智能画像</div>
+            ${persona.summary}
+        </div>`;
+    } else {
+        personaDiv.innerHTML = '';
+    }
+
+    // 重置状态
+    uploadedFiles = [];
+    document.getElementById('previewGrid').innerHTML = ''; document.getElementById('previewGrid').style.display='none';
+    document.getElementById('leftText').value = ''; document.getElementById('rightText').value = '';
+    document.getElementById('opponentText').value = ''; document.getElementById('contextText').value = '';
+    document.getElementById('ocrSection').classList.remove('show');
+    document.getElementById('resultSection').classList.remove('show');
+    document.getElementById('progressText').textContent = '';
+
+    // 默认选上传模式
+    document.querySelectorAll('.input-method-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-method="upload"]').classList.add('active');
+    document.getElementById('uploadArea').style.display = 'block';
+    document.getElementById('textInputArea').classList.remove('active');
+
+    showPage('analyze');
+}
+
+function openAddModal() {
+    editingCharacterId = null;
+    document.getElementById('modalTitle').textContent = '添加角色';
+    ['charName','charGender','charBirthday','charMbti','charRelation','charStyle','charOther'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('characterModal').classList.add('show');
+}
+
+document.getElementById('modalClose').addEventListener('click', () => document.getElementById('characterModal').classList.remove('show'));
+
+window.editCharacter = function(id) {
+    editingCharacterId = id;
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const c = chars.find(x=>x.id===id); if(!c)return;
+    document.getElementById('modalTitle').textContent = '编辑角色';
+    document.getElementById('charName').value = c.name;
+    document.getElementById('charGender').value = c.gender||'';
+    document.getElementById('charBirthday').value = c.birthday||'';
+    document.getElementById('charMbti').value = c.mbti||'';
+    document.getElementById('charRelation').value = c.relation||'';
+    document.getElementById('charStyle').value = c.style||'';
+    document.getElementById('charOther').value = c.other||'';
+    document.getElementById('characterModal').classList.add('show');
+};
+
+window.deleteCharacter = function(id) {
+    if(!confirm('确定删除？'))return;
+    let chars=JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    chars=chars.filter(x=>x.id!==id);
+    localStorage.setItem('chatAnalyzerCharacters',JSON.stringify(chars));
+    loadCharacters();
+};
+
+document.getElementById('saveCharacterBtn').addEventListener('click', () => {
+    const name = document.getElementById('charName').value.trim();
+    if(!name){alert('请输入称呼');return;}
+    const char = {
+        id: editingCharacterId||Date.now().toString(), name,
+        gender: document.getElementById('charGender').value,
+        birthday: document.getElementById('charBirthday').value,
+        mbti: document.getElementById('charMbti').value,
+        relation: document.getElementById('charRelation').value,
+        style: document.getElementById('charStyle').value,
+        other: document.getElementById('charOther').value
+    };
+    let chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    if(editingCharacterId){
+        const i = chars.findIndex(x=>x.id===editingCharacterId); if(i!==-1)chars[i]=char;
+    }else{chars.push(char);}
+    localStorage.setItem('chatAnalyzerCharacters',JSON.stringify(chars));
+    document.getElementById('characterModal').classList.remove('show');
+    loadCharacters();
+});
+
+// 文件上传（多张）
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const previewGrid = document.getElementById('previewGrid');
+
+uploadArea.addEventListener('click', ()=>fileInput.click());
+uploadArea.addEventListener('dragover', e=>{e.preventDefault();uploadArea.classList.add('dragover');});
+uploadArea.addEventListener('dragleave', ()=>uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e=>{
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+    Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')).forEach(addFilePreview);
+});
+fileInput.addEventListener('change', e=>{Array.from(e.target.files).forEach(addFilePreview); e.target.value='';});
+
+function addFilePreview(file) {
+    uploadedFiles.push(file);
+    renderPreviews();
+}
+function removeFile(index) {
+    uploadedFiles.splice(index,1);
+    renderPreviews();
+}
+function renderPreviews() {
+    previewGrid.innerHTML = '';
+    previewGrid.style.display = uploadedFiles.length > 0 ? 'grid' : 'none';
+
+    uploadedFiles.forEach((file,i) => {
+        const reader = new FileReader();
+        reader.onload = (e)=>{
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            item.innerHTML = `<img src="${e.target.result}"><button class="preview-remove" onclick="removeFile(${i})">×</button>`;
+            previewGrid.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 添加按钮
+    const add = document.createElement('div');
+    add.className = 'preview-add';
+    add.innerHTML = '<span class="icon">+</span>';
+    add.addEventListener('click', ()=>fileInput.click());
+    previewGrid.appendChild(add);
+}
+window.removeFile = removeFile;
+
+// 输入方式切换
+document.querySelectorAll('.input-method-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+        document.querySelectorAll('.input-method-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        uploadArea.style.display = btn.dataset.method==='upload' ? 'block' : 'none';
+        previewGrid.style.display = btn.dataset.method==='upload' && uploadedFiles.length>0 ? 'grid' : 'none';
+        document.getElementById('textInputArea').classList.toggle('active', btn.dataset.method==='text');
+    });
+});
+
+// 场景选择
+document.querySelectorAll('.scenario-option').forEach(opt=>{
+    opt.addEventListener('click',()=>{
+        document.querySelectorAll('.scenario-option').forEach(o=>o.classList.remove('selected')); opt.classList.add('selected');
+    });
+});
+
+// ===== 图片预处理：缩小+灰度化，大幅加速OCR =====
+function preprocessImage(file, maxW=600){
+    return new Promise(resolve=>{
+        const reader=new FileReader();
+        reader.onload=e=>{
+            const img=new Image();
+            img.onload=()=>{
+                const c=document.createElement('canvas');
+                const scale=Math.min(1, maxW/img.width);
+                c.width=img.width*scale; c.height=img.height*scale;
+                const ctx=c.getContext('2d');
+                ctx.drawImage(img,0,0,c.width,c.height);
+                // 灰度化 + 提高对比度（OCR识别率更高）
+                const imgData=ctx.getImageData(0,0,c.width,c.height);
+                const d=imgData.data;
+                for(let i=0;i<d.length;i+=4){
+                    let gray=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+                    gray=gray>128?Math.min(255,gray+20):Math.max(0,gray-10);
+                    d[i]=d[i+1]=d[i+2]=gray;
+                }
+                ctx.putImageData(imgData,0,0);
+                c.toBlob(blob=>resolve(new File([blob],file.name,{type:'image/jpeg'})),'image/jpeg',0.6);
+            };
+            img.src=e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// ===== OCR识别：针对DeepSeek优化的全流程 =====
+async function performOCR() {
+    if(!uploadedFiles.length) return;
+    const btn = document.getElementById('startAnalyzeBtn');
+    const progress = document.getElementById('progressText');
+
+    btn.disabled=true;
+    btn.innerHTML='<span class="spinner"></span>预处理图片...';
+    progress.textContent='正在缩小并灰度化图片...';
+
+    try{
+        // 预处理：缩到600px + 灰度增强
+        const smallFiles = await Promise.all(uploadedFiles.map(f=>preprocessImage(f,600)));
+        progress.textContent='加载OCR引擎（首次约10-15秒，后续秒开）...';
+
+        // 创建worker，只加载简体中文，OEM_LSTM_ONLY最快
+        ocrWorker = await Tesseract.createWorker('chi_sim', 1, {
+            logger:m=>{
+                if(m.status==='recognizing text'){
+                    const p=Math.round(m.progress*100);
+                    progress.textContent=`${m.progress ? '识别进度 ' + p + '%' : '识别中...'}`;
+                    if(p>0) btn.innerHTML=`<span class="spinner"></span>${p}%`;
+                }
+            }
+        });
+        await ocrWorker.setParameters({ tessedit_pageseg_mode: 6 });
+
+        // 逐张识别
+        let allText='';
+        for(let i=0;i<smallFiles.length;i++){
+            progress.textContent=`识别第 ${i+1}/${smallFiles.length} 张截图...`;
+            const r = await ocrWorker.recognize(smallFiles[i]);
+            allText+=r.data.text+'\n';
+        }
+
+        if(!allText.trim()){
+            progress.textContent='⚠️ 未识别到文字，请确认截图是否清晰';
+            btn.disabled=false; btn.innerHTML='🔍 重试分析';
+            return;
+        }
+
+        // DeepSeek整理：让AI把OCR原始文本整理成清晰对话
+        progress.textContent='识别完成！正在调用DeepSeek分析...';
+        btn.innerHTML='<span class="spinner"></span>DeepSeek分析中...';
+
+        // 直接进入分析（不需要用户手动确认）
+        await deepSeekAnalyze2(allText.trim());
+    }catch(err){
+        console.error(err);
+        progress.textContent='❌ '+(err.message||'识别失败');
+        btn.disabled=false; btn.innerHTML='🔍 重试分析';
+    }
+}
+
+document.getElementById('reOCR').addEventListener('click', performOCR);
+
+// ===== 开始分析按钮（DeepSeek专用） =====
+document.getElementById('startAnalyzeBtn').addEventListener('click', async()=>{
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    if(!apiUrl||!apiKey){alert('请先在设置中配置API');showPage('settings');return;}
+
+    const isTextMode = document.getElementById('textInputArea').classList.contains('active');
+
+    if(isTextMode){
+        if(!document.getElementById('opponentText').value.trim()){alert('请输入对方说的话');return;}
+        try{await deepSeekAnalyze(
+            document.getElementById('opponentText').value.trim(),
+            document.getElementById('contextText').value.trim(),
+            true
+        );}catch(e){document.getElementById('progressText').textContent='❌ '+e.message;}
+    }else{
+        if(!uploadedFiles.length){alert('请先上传截图');return;}
+        await performOCR(); // OCR后自动调用deepSeekAnalyze
+    }
+});
+
+document.getElementById('confirmAnalyze').addEventListener('click', async()=>{
+    const left=document.getElementById('leftText').value.trim();
+    const right=document.getElementById('rightText').value.trim();
+    if(!left&&!right){alert('请先OCR识别');return;}
+    const text = `【我方】${right||'无'}\n【对方】${left||'无'}`;
+    try{await deepSeekAnalyze(text, '', false);}catch(e){document.getElementById('progressText').textContent='❌ '+e.message;}
+});
+
+// ===== DeepSeek专用分析：直接输入文本模式 =====
+async function deepSeekAnalyze(opponentText, contextText, isTextMode){
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    const modelName=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
+    const btn=document.getElementById('startAnalyzeBtn');
+
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>DeepSeek分析中...';
+    document.getElementById('progressText').textContent='AI正在深度思考...';
+
+    try{
+        const prompt = buildDeepSeekPrompt(opponentText, contextText, isTextMode);
+
+        const res=await fetch(apiUrl,{method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+            body:JSON.stringify({model:modelName,
+                messages:[
+                    {role:'system',content:'你是一个专业的对话分析师，擅长分析微信/聊天对话中对方的真实意图、情绪状态和潜台词。你的回复要细致入微、接地气、有实用价值。'},
+                    {role:'user',content:prompt}
+                ],
+                temperature:0.7,stream:false})
+        });
+        if(!res.ok){
+            const e=await res.json().catch(()=>({}));
+            throw new Error(`API ${res.status}: ${e.error?.message||res.statusText}`);
+        }
+        const data=await res.json();
+        displayAnalysis(data.choices[0].message.content);
+        document.getElementById('ocrSection').classList.add('show');
+        document.getElementById('resultSection').classList.add('show');
+        document.getElementById('progressText').textContent='✅ 分析完成';
+        saveToHistory(prompt, data.choices[0].message.content, isTextMode ? 'text' : 'manual');
+        const em1=parseEmotion(data.choices[0].message.content);
+        if(em1)saveEmotionTrend(currentCharacterId,getCharName(),em1,data.choices[0].message.content);
+    }catch(err){
+        document.getElementById('progressText').textContent='❌ '+err.message;
+        throw err;
+    }finally{
+        btn.disabled=false; btn.innerHTML='🔍 开始分析';
+    }
+}
+
+// ===== DeepSeek专用分析：OCR文本模式（OCR识别后自动调用） =====
+async function deepSeekAnalyze2(ocrRawText){
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    const modelName=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
+    const btn=document.getElementById('startAnalyzeBtn');
+
+    try{
+        const userProfile=getUserProfile();
+        const charInfo=getCharacterInfo(currentCharacterId);
+        const scenario=getScenario();
+
+        const prompt = `${userProfile}${charInfo}\n当前场景：${scenario}\n\n下面是一段从聊天截图识别的原始文字（可能包含一些噪音和格式错误），请你：\n1. 先整理出清晰的对话内容\n2. 然后按以下格式分析\n==========\nOCR原始文字：\n${ocrRawText}\n==========\n\n请按以下格式输出：\n【对话整理】\n- 对方说了什么\n- 我方说了什么\n\n【对方分析】\n- 表面意思：\n- 真实意图：\n- 情绪状态：\n- 潜台词：\n\n【关系/场景】\n\n【回复建议】\n1. 🥰 友好温和型\n回复：\n适用场景：\n\n2. 😅 幽默化解型\n回复：\n适用场景：\n\n3. 🎯 直接明了型\n回复：\n适用场景：`;
+
+        const res=await fetch(apiUrl,{method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+            body:JSON.stringify({model:modelName,
+                messages:[
+                    {role:'system',content:'你是一个专业的对话分析师，擅长从OCR识别的聊天截图中提取对话内容、识别噪音、分析双方意图和情绪，并给出实用的回复建议。'},
+                    {role:'user',content:prompt}
+                ],
+                temperature:0.7,stream:false})
+        });
+        if(!res.ok){
+            const e=await res.json().catch(()=>({}));
+            throw new Error(`API ${res.status}: ${e.error?.message||res.statusText}`);
+        }
+        const data=await res.json();
+        displayAnalysis(data.choices[0].message.content);
+        document.getElementById('ocrSection').classList.add('show');
+        document.getElementById('resultSection').classList.add('show');
+        document.getElementById('progressText').textContent='✅ 分析完成';
+        saveToHistory(ocrRawText, data.choices[0].message.content, 'screenshot');
+        const em2=parseEmotion(data.choices[0].message.content);
+        if(em2)saveEmotionTrend(currentCharacterId,getCharName(),em2,data.choices[0].message.content);
+    }catch(err){
+        document.getElementById('progressText').textContent='❌ '+err.message;
+        throw err;
+    }finally{
+        btn.disabled=false; btn.innerHTML='🔍 开始分析';
+    }
+}
+
+// ===== DeepSeek Prompt构建 =====
+function buildDeepSeekPrompt(opponentText, contextText, isTextMode){
+    const userProfile=getUserProfile();
+    const charInfo=getCharacterInfo(currentCharacterId);
+    const scenario=getScenario();
+
+    if(isTextMode){
+        return `${userProfile}${charInfo}
+当前场景：${scenario}
+
+请分析以下对话情况：
+对方说："${opponentText}"
+${contextText?'之前的对话背景：'+contextText:''}
+
+请按以下格式输出：
+
+【对方分析】
+- 表面意思：
+- 真实意图：
+- 情绪状态：
+- 潜台词：
+
+【回复建议】
+1. 🥰 友好温和型
+回复：
+适用场景：
+
+2. 😅 幽默化解型
+回复：
+适用场景：
+
+3. 🎯 直接明了型
+回复：
+适用场景：`;
+    } else {
+        return `${userProfile}${charInfo}
+当前场景：${scenario}
+
+请分析以下对话内容：
+
+${opponentText}
+
+请按以下格式输出：
+
+【对方分析】
+- 表面意思：
+- 真实意图：
+- 情绪状态：
+- 潜台词：
+
+【回复建议】
+1. 🥰 友好温和型
+回复：
+适用场景：
+
+2. � 幽默化解型
+回复：
+适用场景：
+
+3. 🎯 直接明了型
+回复：
+适用场景：`;
+    }
+}
+
+function getUserProfile(){
+    const p=JSON.parse(localStorage.getItem('chatAnalyzerProfile')||'{}');
+    let d=[];
+    if(p.gender)d.push(p.gender==='male'?'男性':'女性');
+    if(p.age)d.push(p.age+'岁');
+    if(p.mbti)d.push('MBTI：'+p.mbti);
+    if(p.birthday)d.push('生日：'+p.birthday+'（'+getZodiac(p.birthday)+'）');
+    if(p.styles&&p.styles.length)d.push('风格：'+p.styles.join('、'));
+    if(p.other)d.push(p.other);
+    return d.length?'用户信息：'+d.join('；')+'。':'';
+}
+function getCharacterInfo(id){
+    if(!id)return'';
+    const chars=JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const c=chars.find(x=>x.id===id); if(!c)return'';
+    let info=['角色信息：'];
+    info.push('称呼：'+c.name);
+    if(c.gender)info.push('性别：'+getGenderText(c.gender));
+    if(c.birthday)info.push('生日：'+c.birthday+'（'+getZodiac(c.birthday)+'）');
+    if(c.mbti)info.push('MBTI：'+c.mbti);
+    if(c.relation)info.push('关系：'+getRelText(c.relation));
+    if(c.style)info.push('沟通风格：'+c.style);
+    if(c.other)info.push('备注：'+c.other);
+
+    // 注入智能画像
+    const persona = buildSmartPersona(id);
+    if(persona.prompt){
+        info.push('【基于历史数据的性格画像】'+persona.prompt);
+    }
+    return info.join('；')+'。';
+}
+
+// ===== 智能人设引擎：基于历史分析数据动态生成性格画像 =====
+function buildSmartPersona(charId){
+    const trends = JSON.parse(localStorage.getItem('chatAnalyzerTrends')||'[]');
+    const history = JSON.parse(localStorage.getItem('chatAnalyzerHistory')||'[]');
+    const charTrends = trends.filter(t=>t.charId===charId);
+    const charHistory = history.filter(r=>r.charId===charId);
+
+    if(!charTrends.length) return {summary:'',prompt:''};
+
+    const total = charTrends.length;
+    const positiveCount = charTrends.filter(t=>t.score==='positive').length;
+    const negativeCount = charTrends.filter(t=>t.score==='negative').length;
+    const neutralCount = charTrends.filter(t=>t.score==='neutral').length;
+
+    // 趋势：最近5条 vs 全部
+    const recent5 = charTrends.slice(0,Math.min(5,total));
+    const recentPos = recent5.filter(t=>t.score==='positive').length;
+    const recentNeg = recent5.filter(t=>t.score==='negative').length;
+    const allPosRate = total>0 ? positiveCount/total : 0;
+    const recentPosRate = recent5.length>0 ? recentPos/recent5.length : 0;
+
+    // 判断趋势方向
+    let trendDir = recentPosRate > allPosRate+0.3 ? 'warming' :
+                   recentPosRate < allPosRate-0.3 ? 'cooling' : 'stable';
+
+    // 构建情绪分布
+    const mainEmo = positiveCount>=negativeCount && positiveCount>=neutralCount ? 'positive' :
+                    negativeCount>=positiveCount && negativeCount>=neutralCount ? 'negative' : 'neutral';
+
+    // 找出高频情绪词
+    const allEmotions = charTrends.map(t=>t.emotion).filter(Boolean);
+    const freqMap = {};
+    allEmotions.forEach(e=>{
+        e.split(/[，,、\s]/).filter(w=>w.length>0).forEach(w=>{
+            freqMap[w]=(freqMap[w]||0)+1;
+        });
+    });
+    const topEmotions = Object.entries(freqMap).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+
+    // 分析回复采纳偏好
+    const adoptions = JSON.parse(localStorage.getItem('chatAnalyzerAdoptions')||'[]');
+    const charAdoptions = adoptions.filter(a=>a.charId===charId);
+    let preferStyle = '';
+    if(charAdoptions.length){
+        const styleCount = {};
+        charAdoptions.forEach(a=>{
+            if(a.title.includes('温和')) styleCount.warm=(styleCount.warm||0)+1;
+            if(a.title.includes('幽默')) styleCount.humor=(styleCount.humor||0)+1;
+            if(a.title.includes('直接')) styleCount.direct=(styleCount.direct||0)+1;
+        });
+        const topStyle = Object.entries(styleCount).sort((a,b)=>b[1]-a[1])[0];
+        if(topStyle) preferStyle = topStyle[0]==='warm'?'偏好温和型回复':topStyle[0]==='humor'?'偏好幽默型回复':'偏好直接型回复';
+    }
+
+    // === 生成摘要（前端展示用） ===
+    const emoLabel = mainEmo==='positive'?'偏积极':mainEmo==='negative'?'偏消极':'中性偏多';
+    const trendLabel = trendDir==='warming'?'↗ 情绪升温中':trendDir==='cooling'?'↘ 情绪降温中':'→ 情绪平稳';
+    let summary = `分析了${total}次 · ${emoLabel} (积极${positiveCount}/消极${negativeCount}/中性${neutralCount})<br>趋势：${trendLabel}`;
+    if(topEmotions.length) summary += `<br>常出现的情绪：${topEmotions.join('、')}`;
+    if(preferStyle) summary += `<br>采纳偏好：${preferStyle}`;
+
+    // === 生成Prompt注入（给AI看的） ===
+    const emoPrompt = {
+        positive:'从历史分析看，这个人的情绪整体偏积极正面，对你态度友好。回复时可以更自信、轻松一些。',
+        negative:'从历史分析看，这个人整体情绪偏消极或冷淡，可能存在心防或对关系有所保留。回复时建议更谨慎、温和，注意化解负面情绪。',
+        neutral:'从历史分析看，这个人情绪中性偏多，可能在试探阶段。回复时注意观察对方的真实态度。'
+    }[mainEmo]||'';
+
+    const trendPrompt = {
+        warming:'⚠️ 值得注意的是，最近几次对话中对方情绪有明显升温趋势，对你态度在变好。',
+        cooling:'⚠️ 值得注意的是，最近几次对话中对方情绪有明显降温趋势，需要警惕。',
+        stable:'整体来看对方情绪比较稳定，没有明显波动。'
+    }[trendDir]||'';
+
+    let prompt = `${emoPrompt}${trendPrompt}本次分析的次数较多（${total}次），请结合这些历史倾向综合判断。`;
+    if(preferStyle) prompt += `另外，从历史采纳记录看，用户${preferStyle}可以多往这个方向建议。`;
+
+    return {summary, prompt};
+}
+function getScenario(){
+    const sel=document.querySelector('.scenario-option.selected');
+    return sel?{friend:'朋友聊天',work:'工作沟通',love:'恋人相处',family:'家人交流',date:'相亲对象',other:'其他'}[sel.dataset.scenario]||'其他':'未指定';
+}
+function getCharName(){
+    if(!currentCharacterId)return '';
+    const chars=JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const c=chars.find(x=>x.id===currentCharacterId);
+    return c?c.name:'';
+}
+
+function displayAnalysis(text){
+    const pm=text.match(/【对方分析】([\s\S]*?)(?=【回复建议】|【关系|$)/);
+    const rm=text.match(/【关系\/场景】([\s\S]*?)(?=【回复建议】|$)/);
+    const sm=text.match(/【回复建议】([\s\S]*?)$/);
+
+    if(pm){
+        document.getElementById('personAnalysis').innerHTML=pm[1].trim()
+            .replace(/- /g,'<br>• ').replace(/\n+/g,'<br>').replace(/• /g,'<span style="color:#667eea">•</span> ');
+    }
+    if(rm){
+        document.getElementById('relationship').innerHTML=rm[1].trim().replace(/\n+/g,'<br>');
+    } else {
+        document.getElementById('relationship').textContent=getScenario();
+    }
+
+    if(sm){
+        const st=sm[1]; const suggestions=document.getElementById('suggestions');
+        suggestions.innerHTML='';
+        const regex=/\d+\.\s*([🥰😅🎯]\s*[^\n]+)\n回复：([\s\S]*?)(?=适用场景：|$)/g;
+        let m,cnt=0;
+        while((m=regex.exec(st))!==null&&cnt<3){
+            const tp=m[1].trim(),parts=m[2].trim().split('适用场景：'),txt=parts[0].trim(),sc=parts[1]?parts[1].trim():'';
+            const div=document.createElement('div'); div.className='suggestion-item';
+            const sugId='sug-'+Date.now()+'-'+cnt;
+            div.innerHTML=`<div class="suggestion-header">${tp}</div><div class="suggestion-text">${txt}</div>${sc?`<div style="margin-top:6px;font-size:0.83rem;color:#888;">适用：${sc}</div>`:''}
+            <button class="btn btn-small" style="margin-top:8px;background:#4caf50;color:white;border:none;border-radius:4px;font-size:0.82rem;cursor:pointer;" onclick="adoptSuggestion('${sugId}','${tp.replace(/'/g,"\\'")}','${txt.replace(/'/g,"\\'").replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}')">✅ 采纳了这个</button>
+            <span class="adopt-status" id="${sugId}-status" style="display:none;margin-left:8px;font-size:0.82rem;color:#4caf50;">✓ 已采纳</span>`;
+            suggestions.appendChild(div); cnt++;
+        }
+        if(suggestions.children.length===0)suggestions.innerHTML=`<div class="suggestion-item"><div class="suggestion-text">${st.replace(/\n/g,'<br>')}</div></div>`;
+    }
+}
+
+function parseEmotion(analysisText){
+    const emotionMatch=analysisText.match(/情绪状态[：:]\s*(.+?)(?:\n|$)/i);
+    return emotionMatch ? emotionMatch[1].trim() : '';
+}
+
+function getEmotionScore(emotion){
+    const positive=['开心','高兴','热情','喜欢','爱','甜蜜','温暖','感动','友好','愉悦','满意','积极','期待','兴奋','亲昵','温柔'];
+    const negative=['生气','愤怒','冷漠','敷衍','烦躁','伤心','失望','讨厌','冷淡','拒绝','嘲讽','讥笑','鄙视','冷淡','疏远','不耐烦'];
+    const neutral=['试探','犹豫','紧张','不安','尴尬','困惑','好奇','平静','中性','常规'];
+    const e=emotion||'';
+    if(positive.some(w=>e.includes(w))) return 'positive';
+    if(negative.some(w=>e.includes(w))) return 'negative';
+    return 'neutral';
+}
+
+function saveEmotionTrend(charId, charName, emotionText, analysisText){
+    const trend=JSON.parse(localStorage.getItem('chatAnalyzerTrends')||'[]');
+    const emo=getEmotionScore(emotionText);
+    trend.unshift({charId,charName,emotion:emotionText,score:emo,analysisPreview:analysisText.slice(0,100),time:new Date().toISOString()});
+    if(trend.length>100)trend.length=100;
+    localStorage.setItem('chatAnalyzerTrends',JSON.stringify(trend));
+}
+
+window.adoptSuggestion = function(sugId, title, text){
+    const statusEl=document.getElementById(sugId+'-status');
+    if(statusEl){statusEl.style.display='inline';}
+    const btn=event.target; btn.textContent='✓ 已采纳'; btn.style.background='#999'; btn.disabled=true;
+
+    const adoptions=JSON.parse(localStorage.getItem('chatAnalyzerAdoptions')||'[]');
+    adoptions.unshift({sugId,title,text,charId:currentCharacterId,time:new Date().toISOString()});
+    if(adoptions.length>200)adoptions.length=200;
+    localStorage.setItem('chatAnalyzerAdoptions',JSON.stringify(adoptions));
+};
+
+// 我的档案
+function loadUserProfile(){
+    const p=JSON.parse(localStorage.getItem('chatAnalyzerProfile')||'{}');
+    document.getElementById('profileGender').value=p.gender||'';
+    document.getElementById('profileAge').value=p.age||'';
+    document.getElementById('profileMbti').value=p.mbti||'';
+    document.getElementById('profileBirthday').value=p.birthday||'';
+    document.getElementById('profileOther').value=p.other||'';
+    document.querySelectorAll('.style-check').forEach(cb=>cb.checked=(p.styles||[]).includes(cb.value));
+}
+document.getElementById('saveProfileBtn').addEventListener('click',()=>{
+    const p={
+        gender:document.getElementById('profileGender').value,
+        age:document.getElementById('profileAge').value,
+        mbti:document.getElementById('profileMbti').value,
+        birthday:document.getElementById('profileBirthday').value,
+        styles:Array.from(document.querySelectorAll('.style-check')).filter(cb=>cb.checked).map(cb=>cb.value),
+        other:document.getElementById('profileOther').value
+    };
+    localStorage.setItem('chatAnalyzerProfile',JSON.stringify(p)); alert('已保存！');
+});
+
+// API配置
+function loadApiConfig(){
+    const c=JSON.parse(localStorage.getItem('chatAnalyzerConfig')||'{}');
+    document.getElementById('apiUrl').value=c.apiUrl||'';
+    document.getElementById('apiKey').value=c.apiKey||'';
+    document.getElementById('modelName').value=c.modelName||'';
+}
+function saveApiConfig(){
+    localStorage.setItem('chatAnalyzerConfig',JSON.stringify({
+        apiUrl:document.getElementById('apiUrl').value,
+        apiKey:document.getElementById('apiKey').value,
+        modelName:document.getElementById('modelName').value
+    }));
+}
+['apiUrl','apiKey','modelName'].forEach(id=>document.getElementById(id).addEventListener('change',saveApiConfig));
+
+document.querySelectorAll('.quick-config-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+        document.getElementById('apiUrl').value=btn.dataset.url;
+        document.getElementById('modelName').value=btn.dataset.model;
+        saveApiConfig();
+    });
+});
+
+document.getElementById('testConnectionBtn').addEventListener('click',async()=>{
+    const url=document.getElementById('apiUrl').value.trim();
+    const key=document.getElementById('apiKey').value.trim();
+    const model=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
+    const sd=document.getElementById('connectionStatus');
+    const btn=document.getElementById('testConnectionBtn');
+    if(!url||!key){sd.innerHTML='<span style="color:#f44336;">❌ 请填写地址和密钥</span>';return;}
+
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>测试中'; sd.innerHTML='<span style="color:#ff9800;">⏳ 连接中...</span>';
+    try{
+        const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+            body:JSON.stringify({model:model,messages:[{role:'user',content:'Hi'}],max_tokens:10})});
+        if(r.ok)sd.innerHTML='<span style="color:#4caf50;">✅ 连接成功！</span>';
+        else{const e=await r.json().catch(()=>({}));sd.innerHTML=`<span style="color:#f44336;">❌ ${e.error?.message||r.status}</span>`;}
+    }catch(e){sd.innerHTML=`<span style="color:#f44336;">❌ ${e.message}</span>`;}
+    btn.disabled=false; btn.innerHTML='🔗 测试连接';
+});
+
+// ===== 历史记录 =====
+async function saveToHistory(rawText, analysisText, type) {
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const char = chars.find(c=>c.id===currentCharacterId);
+    const charName = char ? char.name : '未知角色';
+
+    let images = [];
+    if (type === 'screenshot' && uploadedFiles.length) {
+        images = await Promise.all(uploadedFiles.map(async f=>{
+            const b64 = await new Promise(resolve=>{
+                const reader=new FileReader();
+                reader.onload=e=>resolve(e.target.result);
+                reader.readAsDataURL(f);
+            });
+            return b64;
+        }));
+    }
+
+    const record = {
+        id: Date.now().toString(),
+        charId: currentCharacterId,
+        charName: charName,
+        type: type,
+        rawText: rawText,
+        analysisText: analysisText,
+        images: images,
+        time: new Date().toISOString()
+    };
+
+    const history = JSON.parse(localStorage.getItem('chatAnalyzerHistory')||'[]');
+    history.unshift(record);
+    if (history.length > 50) history.length = 50;
+    localStorage.setItem('chatAnalyzerHistory', JSON.stringify(history));
+}
+
+function renderHistory() {
+    const list = document.getElementById('htabHistoryList');
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+    const history = JSON.parse(localStorage.getItem('chatAnalyzerHistory')||'[]');
+
+    if (!history.length) {
+        list.innerHTML = '<div class="empty-history">📭 暂无分析记录</div>';
+        return;
+    }
+
+    list.innerHTML = history.map((r,i) => {
+        const d = new Date(r.time);
+        const timeStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const previewText = r.rawText && r.rawText.length > 80 ? r.rawText.substring(0,80)+'...' : (r.rawText||'');
+        const char = chars.find(c=>c.id===r.charId);
+        const charName = r.charName || (char?char.name:'未知');
+        const typeIcon = r.type === 'screenshot' ? '🖼️' : '💬';
+
+        let imgHTML = '';
+        if (r.images && r.images.length) {
+            const showImgs = r.images.slice(0,3);
+            const moreCount = r.images.length - 3;
+            imgHTML = '<div class="history-images">' +
+                showImgs.map(img => `<img src="${img}" alt="">`).join('') +
+                (moreCount > 0 ? `<div class="more">+${moreCount}</div>` : '') +
+                '</div>';
+        }
+
+        return `<div class="history-item" id="history-${r.id}">
+            <div class="history-header">
+                <span class="history-char">${typeIcon} ${charName}</span>
+                <span class="history-time">${timeStr}</span>
+            </div>
+            ${previewText ? `<div class="history-preview">${previewText}</div>` : ''}
+            ${imgHTML}
+            <div class="history-detail" id="detail-${r.id}">
+                <div style="background:#f9f9f9;padding:12px;border-radius:8px;margin-top:8px;white-space:pre-wrap;font-size:0.88rem;color:#555;line-height:1.5;">
+                    ${r.analysisText || '无分析内容'}
+                </div>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:12px;">
+                <button class="history-del-btn" onclick="deleteHistory('${r.id}')">🗑 删除</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    // 点击展开详情
+    history.forEach(r => {
+        const item = document.getElementById('history-'+r.id);
+        if (item) {
+            item.addEventListener('click', function(e) {
+                if (e.target.closest('.history-del-btn')) return;
+                const detail = document.getElementById('detail-'+r.id);
+                detail.classList.toggle('show');
+            });
+        }
+    });
+}
+
+window.deleteHistory = function(id) {
+    if (!confirm('确定删除这条记录？')) return;
+    let history = JSON.parse(localStorage.getItem('chatAnalyzerHistory')||'[]');
+    history = history.filter(r=>r.id!==id);
+    localStorage.setItem('chatAnalyzerHistory', JSON.stringify(history));
+    renderHistory();
+};
+
+function renderAdoptions() {
+    const list = document.getElementById('htabAdoptionList');
+    const adoptions = JSON.parse(localStorage.getItem('chatAnalyzerAdoptions')||'[]');
+    const chars = JSON.parse(localStorage.getItem('chatAnalyzerCharacters')||'[]');
+
+    if (!adoptions.length) {
+        list.innerHTML = '<div class="empty-history">📭 暂无采纳记录<br><span style="font-size:0.85rem;color:#bbb;">分析后点击「✅ 采纳了这个」即可记录</span></div>';
+        return;
+    }
+
+    list.innerHTML = adoptions.map((a,i) => {
+        const d = new Date(a.time);
+        const timeStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const char = chars.find(c=>c.id===a.charId);
+        const charName = char ? char.name : '未知';
+        return `<div class="adoption-item">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span class="adopt-title">${a.title}</span>
+                <span style="font-size:0.78rem;color:#999;">${charName} · ${timeStr}</span>
+            </div>
+            <div class="adopt-text">${a.text}</div>
+        </div>`;
+    }).join('');
+}
+
+// 历史页面tab切换
+document.querySelectorAll('[data-htab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('[data-htab]').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.htab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById('htab' + tab.dataset.htab.charAt(0).toUpperCase() + tab.dataset.htab.slice(1)).classList.remove('hidden');
+    });
+});
+
+loadApiConfig();
+loadUserProfile();
+checkAuth();
+
+// ===== PWA 安装与Service Worker =====
+let deferredPrompt = null;
+const installBanner = document.getElementById('installBanner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!localStorage.getItem('pwaInstallDismissed')) {
+        installBanner.style.display = 'flex';
+    }
+});
+
+document.getElementById('installBtn').addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const result = await deferredPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+        installBanner.style.display = 'none';
+    }
+    deferredPrompt = null;
+});
+
+document.getElementById('installClose').addEventListener('click', () => {
+    installBanner.style.display = 'none';
+    localStorage.setItem('pwaInstallDismissed', '1');
+});
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+window.addEventListener('appinstalled', () => {
+    installBanner.style.display = 'none';
+    deferredPrompt = null;
+});
+</script>
+</body>
+</html>
