@@ -365,6 +365,20 @@
         .chat-send-btn:hover { background: #5a6fd6; }
         .chat-typing { align-self: flex-start; padding: 8px 14px; color: #999; font-size: 0.85rem; }
         .chat-hint { text-align: center; color: #aaa; font-size: 0.82rem; padding: 20px; }
+        .collapse-section {
+            border: 1px solid #eee; border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+        }
+        .collapse-header {
+            padding: 12px 16px; background: #fafafa; cursor: pointer; display: flex;
+            align-items: center; justify-content: space-between; user-select: none;
+        }
+        .collapse-header:hover { background: #f0f0f0; }
+        .collapse-header .ch-title { font-weight: 600; font-size: 0.93rem; color: #333; display: flex; align-items: center; gap: 8px; }
+        .collapse-header .ch-arrow { font-size: 0.8rem; color: #999; transition: transform 0.3s; }
+        .collapse-header .ch-badge { font-size: 0.7rem; background: #667eea; color: white; padding: 2px 8px; border-radius: 10px; }
+        .collapse-body { padding: 0 16px 16px; display: none; }
+        .collapse-section.open .collapse-body { display: block; }
+        .collapse-section.open .ch-arrow { transform: rotate(180deg); }
     </style>
 </head>
 <body>
@@ -448,61 +462,70 @@
                 </div>
             </div>
 
-            <div class="card-title">📤 上传截图 / 直接输入 / AI聊天</div>
-            <div class="input-methods">
-                <div class="input-method-btn active" data-method="upload">
-                    <div class="icon">🖼️</div><div class="label">上传截图</div>
+            <div class="card-title">📤 分析工具</div>
+            <div class="collapse-section open" id="collapseUpload">
+                <div class="collapse-header" onclick="document.getElementById('collapseUpload').classList.toggle('open')">
+                    <span class="ch-title">🖼️ 上传截图<span class="ch-badge" id="imageBadge" style="display:none;">0张</span></span>
+                    <span class="ch-arrow">▼</span>
                 </div>
-                <div class="input-method-btn" data-method="text">
-                    <div class="icon">💬</div><div class="label">直接输入</div>
-                </div>
-                <div class="input-method-btn" data-method="chat">
-                    <div class="icon">🤖</div><div class="label">AI聊天</div>
+                <div class="collapse-body">
+                    <div id="uploadArea" class="upload-area">
+                        <div class="upload-icon">🖼️</div>
+                        <div class="upload-text">拖拽图片到这里 或 点击选择文件</div>
+                        <div class="upload-hint">支持多张 PNG、JPG 截图</div>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/png,image/jpeg" multiple capture="environment" style="display:none;">
+                    <div class="preview-grid" id="previewGrid" style="display:none;"></div>
+                    <button class="btn btn-primary" id="screenshotAnalyzeBtn" style="margin-top:12px;" disabled>🔍 识别并分析截图</button>
                 </div>
             </div>
 
-            <div id="uploadArea" class="upload-area">
-                <div class="upload-icon">🖼️</div>
-                <div class="upload-text">拖拽图片到这里 或 点击选择文件</div>
-                <div class="upload-hint">支持多张 PNG、JPG 截图</div>
+            <div class="collapse-section" id="collapseText">
+                <div class="collapse-header" onclick="document.getElementById('collapseText').classList.toggle('open')">
+                    <span class="ch-title">💬 直接输入</span>
+                    <span class="ch-arrow">▼</span>
+                </div>
+                <div class="collapse-body">
+                    <div class="form-group">
+                        <label>对话场景</label>
+                        <div class="scenario-select">
+                            <div class="scenario-option selected" data-scenario="friend">朋友聊天</div>
+                            <div class="scenario-option" data-scenario="work">工作沟通</div>
+                            <div class="scenario-option" data-scenario="love">恋人相处</div>
+                            <div class="scenario-option" data-scenario="family">家人交流</div>
+                            <div class="scenario-option" data-scenario="date">相亲对象</div>
+                            <div class="scenario-option" data-scenario="other">其他</div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>🗨️ 对方说了什么</label>
+                        <textarea id="opponentText" class="editable-text" placeholder="请输入对方说的话..." style="min-height:60px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>💭 我方上下文（可选）</label>
+                        <textarea id="contextText" class="editable-text" placeholder="如果有之前的对话背景..." style="min-height:60px;"></textarea>
+                    </div>
+                    <button class="btn btn-primary" id="textAnalyzeBtn">🔍 开始分析</button>
+                </div>
             </div>
-            <input type="file" id="fileInput" accept="image/png,image/jpeg" multiple capture="environment" style="display:none;">
-            <div class="preview-grid" id="previewGrid" style="display:none;"></div>
 
-            <div class="text-input-area" id="textInputArea">
-                <div class="form-group">
-                    <label>对话场景</label>
-                    <div class="scenario-select">
-                        <div class="scenario-option selected" data-scenario="friend">朋友聊天</div>
-                        <div class="scenario-option" data-scenario="work">工作沟通</div>
-                        <div class="scenario-option" data-scenario="love">恋人相处</div>
-                        <div class="scenario-option" data-scenario="family">家人交流</div>
-                        <div class="scenario-option" data-scenario="date">相亲对象</div>
-                        <div class="scenario-option" data-scenario="other">其他</div>
+            <div class="collapse-section" id="collapseChat">
+                <div class="collapse-header" onclick="document.getElementById('collapseChat').classList.toggle('open')">
+                    <span class="ch-title">🤖 AI聊天</span>
+                    <span class="ch-arrow">▼</span>
+                </div>
+                <div class="collapse-body">
+                    <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">和AI聊聊你与这个角色的情况，AI会记住你的想法并帮你分析</div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-hint">开始说说你现在的想法吧～</div>
+                    </div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chatInput" placeholder="说说你的想法...">
+                        <button class="chat-send-btn" id="chatSendBtn">发送</button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>🗨️ 对方说了什么</label>
-                    <textarea id="opponentText" class="editable-text" placeholder="请输入对方说的话..." style="min-height:60px;"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>💭 我方上下文（可选）</label>
-                    <textarea id="contextText" class="editable-text" placeholder="如果有之前的对话背景..." style="min-height:60px;"></textarea>
-                </div>
             </div>
 
-            <div class="chat-area" id="chatArea">
-                <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">🤖 和AI聊聊你与这个角色的情况，AI会记住你的想法并帮你分析</div>
-                <div class="chat-messages" id="chatMessages">
-                    <div class="chat-hint">开始说说你现在的想法吧～</div>
-                </div>
-                <div class="chat-input-row">
-                    <input type="text" id="chatInput" placeholder="说说你的想法...">
-                    <button class="chat-send-btn" id="chatSendBtn">发送</button>
-                </div>
-            </div>
-
-            <button class="btn btn-primary" id="startAnalyzeBtn" style="margin-top:16px;">🔍 开始分析</button>
             <div class="progress-text" id="progressText"></div>
         </div>
 
@@ -845,25 +868,20 @@ function openAnalyze(charId) {
         personaDiv.innerHTML = '';
     }
 
-    // 重置状态
-    uploadedFiles = [];
-    document.getElementById('previewGrid').innerHTML = ''; document.getElementById('previewGrid').style.display='none';
-    document.getElementById('leftText').value = ''; document.getElementById('rightText').value = '';
-    document.getElementById('opponentText').value = ''; document.getElementById('contextText').value = '';
-    document.getElementById('ocrSection').classList.remove('show');
-    document.getElementById('resultSection').classList.remove('show');
-    document.getElementById('progressText').textContent = '';
-
-    // 默认选上传模式
-    document.querySelectorAll('.input-method-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-method="upload"]').classList.add('active');
-    document.getElementById('uploadArea').style.display = 'block';
-    document.getElementById('textInputArea').classList.remove('active');
-    document.getElementById('chatArea').classList.remove('active');
-    document.getElementById('startAnalyzeBtn').style.display = '';
-
-    // 重置聊天
-    resetChat();
+    // 不再重置状态——保持用户所有操作
+    if (currentCharacterId !== charId) {
+        // 切换到不同角色时才重置
+        uploadedFiles = [];
+        document.getElementById('previewGrid').innerHTML = ''; document.getElementById('previewGrid').style.display='none';
+        document.getElementById('imageBadge').style.display='none';
+        document.getElementById('screenshotAnalyzeBtn').disabled = true;
+        document.getElementById('leftText').value = ''; document.getElementById('rightText').value = '';
+        document.getElementById('opponentText').value = ''; document.getElementById('contextText').value = '';
+        document.getElementById('ocrSection').classList.remove('show');
+        document.getElementById('resultSection').classList.remove('show');
+        document.getElementById('progressText').textContent = '';
+        resetChat();
+    }
 
     showPage('analyze');
 }
@@ -946,6 +964,10 @@ function removeFile(index) {
 function renderPreviews() {
     previewGrid.innerHTML = '';
     previewGrid.style.display = uploadedFiles.length > 0 ? 'grid' : 'none';
+    const badge = document.getElementById('imageBadge');
+    badge.textContent = uploadedFiles.length + '张';
+    badge.style.display = uploadedFiles.length > 0 ? 'inline' : 'none';
+    document.getElementById('screenshotAnalyzeBtn').disabled = uploadedFiles.length === 0;
 
     uploadedFiles.forEach((file,i) => {
         const reader = new FileReader();
@@ -967,22 +989,29 @@ function renderPreviews() {
 }
 window.removeFile = removeFile;
 
-// 输入方式切换
-document.querySelectorAll('.input-method-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-        document.querySelectorAll('.input-method-btn').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        const method = btn.dataset.method;
-        uploadArea.style.display = method==='upload' ? 'block' : 'none';
-        previewGrid.style.display = method==='upload' && uploadedFiles.length>0 ? 'grid' : 'none';
-        document.getElementById('textInputArea').classList.toggle('active', method==='text');
-        document.getElementById('chatArea').classList.toggle('active', method==='chat');
-        document.getElementById('startAnalyzeBtn').style.display = method==='chat' ? 'none' : '';
-        if(method==='chat'){
-            resetChat();
-            addChatMsg('ai','你好！我是你的对话分析助手 🤖\n\n我知道你正在和「'+getCharName()+'」交流。随便和我聊聊你的想法、困惑或者感受吧，我会帮你理清思路～');
-        }
-    });
+// 截图分析按钮
+document.getElementById('screenshotAnalyzeBtn').addEventListener('click', async()=>{
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    if(!apiUrl||!apiKey){alert('请先在设置中配置API');showPage('settings');return;}
+    if(!uploadedFiles.length){alert('请先上传截图');return;}
+    await performOCR();
+});
+
+// 文本分析按钮
+document.getElementById('textAnalyzeBtn').addEventListener('click', async()=>{
+    const apiUrl=document.getElementById('apiUrl').value.trim();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    if(!apiUrl||!apiKey){alert('请先在设置中配置API');showPage('settings');return;}
+    if(!document.getElementById('opponentText').value.trim()){alert('请输入对方说的话');return;}
+    const btn=document.getElementById('textAnalyzeBtn');
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>分析中...';
+    try{await deepSeekAnalyze(
+        document.getElementById('opponentText').value.trim(),
+        document.getElementById('contextText').value.trim(),
+        true
+    );}catch(e){document.getElementById('progressText').textContent='❌ '+e.message;}
+    btn.disabled=false; btn.innerHTML='🔍 开始分析';
 });
 
 // 场景选择
@@ -1024,7 +1053,7 @@ function preprocessImage(file, maxW=600){
 // ===== OCR识别：针对DeepSeek优化的全流程 =====
 async function performOCR() {
     if(!uploadedFiles.length) return;
-    const btn = document.getElementById('startAnalyzeBtn');
+    const btn = document.getElementById('screenshotAnalyzeBtn');
     const progress = document.getElementById('progressText');
 
     btn.disabled=true;
@@ -1077,27 +1106,6 @@ async function performOCR() {
 
 document.getElementById('reOCR').addEventListener('click', performOCR);
 
-// ===== 开始分析按钮（DeepSeek专用） =====
-document.getElementById('startAnalyzeBtn').addEventListener('click', async()=>{
-    const apiUrl=document.getElementById('apiUrl').value.trim();
-    const apiKey=document.getElementById('apiKey').value.trim();
-    if(!apiUrl||!apiKey){alert('请先在设置中配置API');showPage('settings');return;}
-
-    const isTextMode = document.getElementById('textInputArea').classList.contains('active');
-
-    if(isTextMode){
-        if(!document.getElementById('opponentText').value.trim()){alert('请输入对方说的话');return;}
-        try{await deepSeekAnalyze(
-            document.getElementById('opponentText').value.trim(),
-            document.getElementById('contextText').value.trim(),
-            true
-        );}catch(e){document.getElementById('progressText').textContent='❌ '+e.message;}
-    }else{
-        if(!uploadedFiles.length){alert('请先上传截图');return;}
-        await performOCR(); // OCR后自动调用deepSeekAnalyze
-    }
-});
-
 document.getElementById('confirmAnalyze').addEventListener('click', async()=>{
     const left=document.getElementById('leftText').value.trim();
     const right=document.getElementById('rightText').value.trim();
@@ -1111,10 +1119,38 @@ let chatHistory = [];
 let chatCharId = null;
 
 function resetChat(){
-    chatHistory = [];
     chatCharId = currentCharacterId;
     const msgDiv = document.getElementById('chatMessages');
-    msgDiv.innerHTML = '<div class="chat-hint">开始说说你现在的想法吧～</div>';
+    // 尝试加载该角色的聊天历史
+    const saved = JSON.parse(localStorage.getItem('chatAnalyzerChats')||'{}');
+    const savedChat = saved[chatCharId];
+    if(savedChat && savedChat.length > 0){
+        chatHistory = savedChat;
+        msgDiv.innerHTML = '';
+        chatHistory.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + (msg.role==='assistant'?'ai':'user');
+            if(msg.role==='assistant'){
+                const parts = (msg.content||'').split('【自我分析】');
+                const mainText = parts[0];
+                const insight = parts[1] ? parts[1].trim() : '';
+                div.innerHTML = `<div class="ai-label">🤖 AI助手</div>${mainText.replace(/\n/g,'<br>')}${insight ? `<div class="ai-insight">💡 ${insight}</div>` : ''}`;
+            } else {
+                div.textContent = msg.content;
+            }
+            msgDiv.appendChild(div);
+        });
+        msgDiv.scrollTop = msgDiv.scrollHeight;
+    } else {
+        chatHistory = [];
+        msgDiv.innerHTML = '<div class="chat-hint">开始说说你现在的想法吧～</div>';
+    }
+}
+
+function saveChatHistory(){
+    const saved = JSON.parse(localStorage.getItem('chatAnalyzerChats')||'{}');
+    saved[chatCharId] = chatHistory.slice(-30);
+    localStorage.setItem('chatAnalyzerChats', JSON.stringify(saved));
 }
 
 function buildChatPersona() {
@@ -1197,6 +1233,7 @@ document.getElementById('chatSendBtn').addEventListener('click', async ()=>{
         typing.remove();
         addChatMsg('ai', reply);
         chatHistory.push({role:'assistant', content:reply});
+        saveChatHistory();
 
         // 保存聊天洞察到情感趋势
         const insight = reply.split('【自我分析】')[1];
@@ -1220,7 +1257,7 @@ async function deepSeekAnalyze(opponentText, contextText, isTextMode){
     const apiUrl=document.getElementById('apiUrl').value.trim();
     const apiKey=document.getElementById('apiKey').value.trim();
     const modelName=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
-    const btn=document.getElementById('startAnalyzeBtn');
+    const btn=document.getElementById('textAnalyzeBtn');
 
     btn.disabled=true; btn.innerHTML='<span class="spinner"></span>DeepSeek分析中...';
     document.getElementById('progressText').textContent='AI正在深度思考...';
@@ -1262,7 +1299,7 @@ async function deepSeekAnalyze2(ocrRawText){
     const apiUrl=document.getElementById('apiUrl').value.trim();
     const apiKey=document.getElementById('apiKey').value.trim();
     const modelName=document.getElementById('modelName').value.trim()||'deepseek-v4-pro';
-    const btn=document.getElementById('startAnalyzeBtn');
+    const btn=document.getElementById('screenshotAnalyzeBtn');
 
     try{
         const userProfile=getUserProfile();
