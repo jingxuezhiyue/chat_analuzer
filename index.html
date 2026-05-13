@@ -584,7 +584,11 @@
                     </div>
                     <div class="form-group">
                         <label>生日</label>
-                        <input type="date" id="profileBirthday" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;">
+                        <div style="display:flex;gap:6px;">
+                            <select id="profileYear" style="flex:2;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">年</option></select>
+                            <select id="profileMonth" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">月</option></select>
+                            <select id="profileDay" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">日</option></select>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>MBTI性格</label>
@@ -664,7 +668,13 @@
             <div>
                 <div class="form-group"><label>称呼（代号）</label><input type="text" id="charName" placeholder="如：同事小李、相亲对象"></div>
                 <div class="form-group"><label>性别</label><select id="charGender"><option value="">请选择</option><option value="male">男</option><option value="female">女</option></select></div>
-                <div class="form-group"><label>生日（估计）</label><input type="date" id="charBirthday" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;"></div>
+                <div class="form-group"><label>生日（估计）</label>
+                    <div style="display:flex;gap:6px;">
+                        <select id="charYear" style="flex:2;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">年</option></select>
+                        <select id="charMonth" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">月</option></select>
+                        <select id="charDay" style="flex:1;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:0.93rem;"><option value="">日</option></select>
+                    </div>
+                </div>
                 <div class="form-group"><label>MBTI（估计）</label><select id="charMbti">
                     <option value="">请选择</option>
                     <option value="INTJ">INTJ</option><option value="INTP">INTP</option><option value="ENTJ">ENTJ</option><option value="ENTP">ENTP</option>
@@ -889,7 +899,8 @@ function openAnalyze(charId) {
 function openAddModal() {
     editingCharacterId = null;
     document.getElementById('modalTitle').textContent = '添加角色';
-    ['charName','charGender','charBirthday','charMbti','charRelation','charStyle','charOther'].forEach(id => document.getElementById(id).value = '');
+    ['charName','charGender','charMbti','charRelation','charStyle','charOther'].forEach(id => document.getElementById(id).value = '');
+    initDateDropdowns('char');
     document.getElementById('characterModal').classList.add('show');
 }
 
@@ -902,7 +913,8 @@ window.editCharacter = function(id) {
     document.getElementById('modalTitle').textContent = '编辑角色';
     document.getElementById('charName').value = c.name;
     document.getElementById('charGender').value = c.gender||'';
-    document.getElementById('charBirthday').value = c.birthday||'';
+    initDateDropdowns('char');
+    setDateToDropdowns('char', c.birthday);
     document.getElementById('charMbti').value = c.mbti||'';
     document.getElementById('charRelation').value = c.relation||'';
     document.getElementById('charStyle').value = c.style||'';
@@ -924,7 +936,7 @@ document.getElementById('saveCharacterBtn').addEventListener('click', () => {
     const char = {
         id: editingCharacterId||Date.now().toString(), name,
         gender: document.getElementById('charGender').value,
-        birthday: document.getElementById('charBirthday').value,
+        birthday: getDateFromDropdowns('char'),
         mbti: document.getElementById('charMbti').value,
         relation: document.getElementById('charRelation').value,
         style: document.getElementById('charStyle').value,
@@ -1524,6 +1536,39 @@ function getCharName(){
     return c?c.name:'';
 }
 
+// 生日下拉框初始化
+function initDateDropdowns(prefix){
+    const ySel = document.getElementById(prefix+'Year');
+    const mSel = document.getElementById(prefix+'Month');
+    const dSel = document.getElementById(prefix+'Day');
+    if(ySel.options.length>1) return;
+    const nowYear = new Date().getFullYear();
+    for(let y=nowYear; y>=1940; y--) ySel.add(new Option(y, y));
+    for(let m=1; m<=12; m++) mSel.add(new Option(m, m));
+    for(let d=1; d<=31; d++) dSel.add(new Option(d, d));
+    mSel.onchange = ()=>{
+        const y=parseInt(ySel.value), m=parseInt(mSel.value);
+        const maxDay = (y&&m)? new Date(y,m,0).getDate() : 31;
+        dSel.options.length=1;
+        for(let d=1; d<=maxDay; d++) dSel.add(new Option(d, d));
+    };
+    ySel.onchange = ()=>{ if(mSel.value) mSel.onchange(); };
+}
+function getDateFromDropdowns(prefix){
+    const y=document.getElementById(prefix+'Year').value;
+    const m=String(document.getElementById(prefix+'Month').value).padStart(2,'0');
+    const d=String(document.getElementById(prefix+'Day').value).padStart(2,'0');
+    return (y&&m&&d!=='00') ? `${y}-${m}-${d}` : '';
+}
+function setDateToDropdowns(prefix, dateStr){
+    if(!dateStr) return;
+    const parts = dateStr.split('-');
+    if(parts.length!==3) return;
+    document.getElementById(prefix+'Year').value = parts[0];
+    document.getElementById(prefix+'Month').value = parseInt(parts[1]);
+    setTimeout(()=>{ document.getElementById(prefix+'Day').value = parseInt(parts[2]); }, 100);
+}
+
 function displayAnalysis(text){
     const pm=text.match(/【对方分析】([\s\S]*?)(?=【回复建议】|【关系|$)/);
     const rm=text.match(/【关系\/场景】([\s\S]*?)(?=【回复建议】|$)/);
@@ -1597,7 +1642,8 @@ function loadUserProfile(){
     document.getElementById('profileGender').value=p.gender||'';
     document.getElementById('profileAge').value=p.age||'';
     document.getElementById('profileMbti').value=p.mbti||'';
-    document.getElementById('profileBirthday').value=p.birthday||'';
+    initDateDropdowns('profile');
+    setDateToDropdowns('profile', p.birthday);
     document.getElementById('profileOther').value=p.other||'';
     document.querySelectorAll('.style-check').forEach(cb=>cb.checked=(p.styles||[]).includes(cb.value));
 }
@@ -1606,7 +1652,7 @@ document.getElementById('saveProfileBtn').addEventListener('click',()=>{
         gender:document.getElementById('profileGender').value,
         age:document.getElementById('profileAge').value,
         mbti:document.getElementById('profileMbti').value,
-        birthday:document.getElementById('profileBirthday').value,
+        birthday: getDateFromDropdowns('profile'),
         styles:Array.from(document.querySelectorAll('.style-check')).filter(cb=>cb.checked).map(cb=>cb.value),
         other:document.getElementById('profileOther').value
     };
